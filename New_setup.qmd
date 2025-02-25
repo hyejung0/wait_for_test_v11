@@ -1,0 +1,515 @@
+---
+title: "New setup"
+date: today
+format:
+  html:
+    css: aside_left_margin.css
+    #self-contained: true 
+    embed-resources: true
+    code-fold: true
+    toc: true
+    number-sections: true
+execute:
+  cache: true
+editor_options:
+  chunk_output_type: console
+indent: true
+indenting: "medium"
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+```{r include=FALSE}
+#| message: false
+#| warning: false
+
+library(ggplot2)
+library(officer)
+library(officedown)
+library(flextable)
+library(data.table)
+library(parallel)
+library(kableExtra)
+library(knitr)
+library(lubridate)
+library(tictoc)
+library(gt)
+knitr::opts_chunk$set(echo = FALSE)
+
+
+setDTthreads(2)    # use all available cores (default)
+getDTthreads()     # check how many cores are currently used
+
+ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+# dat7_biopsy<-readRDS("../EDA_V9/dat7_biopsy_raw.rds") #no exclusion whatsover. 
+
+```
+
+# Hypothesis
+
+We desire to answer the following question:
+
+What is the effect of waiting for test results (to find out target able
+mutation status and or PDL1 expression) results prior to initiating 1L
+on the survival of advanced non-small cell lung cancer patients?
+
+There are wo says to answer this question.
+
+1.  Simple case: fix the time point which we want to answer. That is,
+    what is the effect of waiting for maximum 3 weeks prior to
+    initiating 1L on survival?
+    -   Based on the epi textbook:Among persons who initiated 1L before
+        waiting for the test result, what amount of the incidence of
+        death is initiaing 1L immeditaely responsible for? Should
+        anything be done to modify or eliminate immeditaely initiation
+        of 1L?
+
+2.  Complex case: let the number of weeks vary and pool the results.
+    That is, in general, what is the effect of waiting for test result
+    prior to initiating 1L on survival?
+
+```{r fig.show="hold", fig.width=6, fig.height=6}
+#| label: fig-mock_result
+#| code-fold: true
+#| echo: false
+#| warning: false
+#| fig-cap: Mock graph of the result
+
+
+#generate mock result
+
+this_df<-data.table(
+  y=c(0.2,0.1,0.05,0.045,0.040,0.018),
+  x=0:5
+)
+this_df<-data.frame(this_df)
+ggplot(this_df, mapping = aes(x=x, y=y))+
+  geom_line()+
+  geom_point()+
+  ylab("Risk difference")+
+  xlab("Week (k) from time zero")
+
+```
+
+If we are reporting the simple case, we are fixing $k=3$, where the risk difference is `r this_df$y[this_df$x==3]`.
+
+
+\
+
+# Set up
+
+\begin{align}
+k&=\{1,2,...\} \text{, number of weeks from time zero.} \\
+A_k &=\begin{cases}
+        1, & \text{if treatment is initiated prior to minimum of end of week k and valid test result} \\
+        0, & \text{if treatment is NOT initiated prior to minimum of end of week k and valid test result.}
+      \end{cases} 
+\end{align}
+
+where the "valid test" is the test result indicating negative or
+positive for targetable mutations or PD1L expression. This information
+is provided in the dataset in the "BiomarkerStatus" column. If the
+column has any one of the following entries, the observation is
+considered valid.:
+
+[Check with Wally if the followings are to be used:]{.aside}
+
+[- No interpretation given in report\
+- Unsuccessful/indeterminate test - Unknown - Variant of Unknown
+Significance (VUS) positive - Results pending - Equivocal - Other result
+type positive - Unknown result type positive - PD-L1 equivocal]{.aside}
+
+-   Mutation positive
+
+-   PD-L1 positive
+
+-   Rearrangement present
+
+-   Rearrangement positive
+
+-   Amplification positive
+
+-   Protein expression positive
+
+-   PD-L1 positive
+
+-   Mutation negative
+
+-   Negative
+
+-   PD-L1 negative/not detected
+
+-   Rearrangement not present
+
+\
+
+# Exclusion
+
+```{r exclusion-tbl}
+#| echo: false
+#| eval: true
+#| label: tbl-exclusion_Criteria
+#| tbl-cap: Exclusion criteria, applied sequentially from top to bottom. Initial sample size is 85,572. The "Diagnosis" outer column header shows the "Number excluded" and "Number remaining" when the time zero is set as advanced diagnosis date. Similarly, the "Biopsy" outer column header shows the same things when the time zero is set at the 1st biopsy on or after advanced diagnosis date. 
+
+
+#read in the code from 
+#new_setup_baseline_biopsy.R
+#new_setup_baseline_diagnosis.R
+
+
+diag<-readRDS("ptData_time0_diag.rds")
+biop<-readRDS("ptData_time0_biop.rds")
+ 
+#Keep track of number for exclusion
+exclusion_tab<-data.table(
+  "Exclusion"=c("Missing time zero","Started 1L therapy before time zero","Observed valid test result before time zero","Does not have observed event/censoring date"),
+  "Number excluded__Diagnosis"=as.numeric(NA),
+  "Number remaining__Diagnosis"=as.numeric(NA),
+  "Number excluded__Biopsy"=as.numeric(NA),
+  "Number remaining__Biopsy"=as.numeric(NA)  
+)
+
+
+
+#for diag
+#"Missing time zero"
+exclusion_tab[Exclusion=="Missing time zero", `Number excluded__Diagnosis`:=diag[is.na(time0),.N]]
+exclusion_tab[Exclusion=="Missing time zero", `Number remaining__Diagnosis`:=diag[!is.na(time0),.N]]
+diag<-diag[!is.na(time0),]
+
+
+#"Started 1L therapy before time zero"
+exclusion_tab[Exclusion=="Started 1L therapy before time zero", `Number excluded__Diagnosis`:=diag[StartDate<time0,.N]]
+exclusion_tab[Exclusion=="Started 1L therapy before time zero", `Number remaining__Diagnosis`:=diag[StartDate>=time0 | is.na(StartDate),.N]]
+diag<-diag[StartDate>=time0 | is.na(StartDate),]
+
+#"Observed valid test result before time zero"
+exclusion_tab[Exclusion=="Observed valid test result before time zero", `Number excluded__Diagnosis`:=diag[observe_valid__before_time0==TRUE,.N]]
+exclusion_tab[Exclusion=="Observed valid test result before time zero", `Number remaining__Diagnosis`:=diag[observe_valid__before_time0==FALSE,.N]]
+diag<-diag[observe_valid__before_time0==FALSE,]
+
+#"Does not have observed event/censoring"
+exclusion_tab[Exclusion=="Does not have observed event/censoring date", `Number excluded__Diagnosis`:=diag[DateOfDeath==AdvancedDiagnosisDate & DeathInd==0,.N]]
+exclusion_tab[Exclusion=="Does not have observed event/censoring date", `Number remaining__Diagnosis`:=diag[!(DateOfDeath==AdvancedDiagnosisDate & DeathInd==0),.N]]
+diag<-diag[!(DateOfDeath==AdvancedDiagnosisDate & DeathInd==0),]
+
+
+
+
+
+
+#for biopsy
+#"Missing time zero"
+exclusion_tab[Exclusion=="Missing time zero", `Number excluded__Biopsy`:=biop[is.na(time0),.N]]
+exclusion_tab[Exclusion=="Missing time zero", `Number remaining__Biopsy`:=biop[!is.na(time0),.N]]
+biop<-biop[!is.na(time0),]
+
+#"Started 1L therapy before time zero"
+exclusion_tab[Exclusion=="Started 1L therapy before time zero", `Number excluded__Biopsy`:=biop[StartDate<time0,.N]]
+exclusion_tab[Exclusion=="Started 1L therapy before time zero", `Number remaining__Biopsy`:=biop[StartDate>=time0 | is.na(StartDate),.N]]
+biop<-biop[StartDate>=time0 | is.na(StartDate),]
+
+
+#"Observed valid test result before time zero"
+exclusion_tab[Exclusion=="Observed valid test result before time zero", `Number excluded__Biopsy`:=biop[observe_valid__before_time0==TRUE,.N]]
+exclusion_tab[Exclusion=="Observed valid test result before time zero", `Number remaining__Biopsy`:=biop[observe_valid__before_time0==FALSE,.N]]
+biop<-biop[observe_valid__before_time0==FALSE,]
+
+
+#"Does not have observed event/censoring"
+exclusion_tab[Exclusion=="Does not have observed event/censoring date", `Number excluded__Biopsy`:=biop[DateOfDeath==AdvancedDiagnosisDate & DeathInd==0,.N]]
+exclusion_tab[Exclusion=="Does not have observed event/censoring date", `Number remaining__Biopsy`:=biop[!(DateOfDeath==AdvancedDiagnosisDate & DeathInd==0),.N]]
+biop<-biop[!(DateOfDeath==AdvancedDiagnosisDate & DeathInd==0),]
+
+
+#save the final sample size to print out in the text.
+diag_n<-exclusion_tab[Exclusion=="Does not have observed event/censoring date", `Number remaining__Diagnosis`]
+biop_n<-exclusion_tab[Exclusion=="Does not have observed event/censoring date", `Number remaining__Biopsy`]
+
+#Print table
+these_cols<-stringr::str_subset(colnames(exclusion_tab),"__")
+newnames<-sub("__.*","",these_cols)
+names(newnames)<-these_cols
+
+
+
+gt(exclusion_tab) |> 
+  tab_spanner(
+    #Nested column for time0 = diagnosis
+    label = "Diagnosis",
+    columns =these_cols[1:2]
+  )  |>  
+  cols_label(
+    !!!newnames[1:2]
+  ) |> 
+  tab_spanner(
+    #Nested column for time0 = diagnosis
+    label = "Biopsy",
+    columns =these_cols[3:4]
+  ) |> 
+  cols_label(
+    !!!newnames[3:4]
+  ) |> 
+  cols_label(
+    #Bold font
+    `Exclusion`=md("**Exclusion**"),
+    `Number excluded__Diagnosis`=md("**Number excluded**"),
+    `Number remaining__Diagnosis`=md("**Number remaining**"),
+    `Number excluded__Biopsy`=md("**Number excluded**"),
+    `Number remaining__Biopsy`=md("**Number remaining**")
+   )
+  
+
+
+```
+
+@tbl-exclusion_Criteria shows show exclusion criteria and sample number
+when the time zero is set as either advanced diagnosis date or 1st
+biopsy date $>=$ advanced diagnosis date.
+
+Based on the table, using advanced diagnosis date as time zero results
+in sample size of `r as.character(diag_n)`, while using 1st biopsy date
+$>=$ advanced diagnosis date results in sample size of
+`r as.character(biop_n)`.
+
+\
+
+# Proportion of patients experiencing important events
+
+In this section, we present cumulative proportion of patients
+experiencing the following events in each $k$(week):
+
+1.  Earliest valid test result
+2.  Staring 1L therapy
+3.  Death
+4.  $A_k$
+
+## Cumulative proportion of earliest valid test result
+
+```{r prop_valid_test_tbl}
+#| echo: false
+#| eval: true
+#| label: tbl-prop_valid_test
+#| tbl-cap: Cumulative proportion of earliest valid test
+#| tbl-subcap: ["Diagnosis", "Biopsy"]
+#| layout-ncol: 2
+
+
+#Proportion experience earliest valid test result in each week
+
+
+diag<-readRDS("prop_exp_valid_test_DT_list_diag.rds") #new_setup_baseline_diagnosis.R
+biop<-readRDS("prop_exp_valid_test_DT_list_biop.rds") #new_setup_baseline_biopsy.R
+
+# table on the left
+diag
+
+# table on the right
+biop
+
+
+```
+
+## Cumulative proportion of 1L initiation
+
+```{r prop_1L_tbl}
+#| echo: false
+#| eval: true
+#| label: tbl-prop_1L
+#| tbl-cap: Cumulative proportion of 1L therapy initiation
+#| tbl-subcap: ["Diagnosis", "Biopsy"]
+#| layout-ncol: 2
+
+
+#Proportion experience 1L therapy
+
+
+
+diag<-readRDS("prop_exp_1L_DT_list_diag.rds") #new_setup_baseline_diagnosis.R
+biop<-readRDS("prop_exp_1L_DT_list_biop.rds") #new_setup_baseline_biopsy.R
+
+# table on the left
+diag
+
+# table on the right
+biop
+
+
+```
+
+## Cumulative proportion of death
+
+Population used to calculate the proportion of death is the people who
+died (did not take the whole dataset).
+
+```{r prop_dead}
+#| echo: false
+#| eval: true
+#| label: tbl-prop_deeath
+#| tbl-cap: Cumulative proportion of death
+#| tbl-subcap: ["Diagnosis", "Biopsy"]
+#| layout-ncol: 2
+
+
+#Proportion experience death
+
+diag<-readRDS("prop_exp_event_DT_list_diag.rds") #new_setup_baseline_diagnosis.R
+biop<-readRDS("prop_exp_event_DT_list_biop.rds") #new_setup_baseline_biopsy.R
+
+# table on the left
+diag
+
+# table on the right
+biop
+
+
+```
+
+## Cumulative proportion of $A_k$
+
+```{r print-A_k}
+#| echo: false
+#| eval: true
+#| label: tbl-A_k
+#| tbl-cap: Cumulative proportion of A_k
+#| tbl-subcap: ["Diagnosis", "Biopsy"]
+#| layout-ncol: 2
+
+
+#Proportion !_k
+
+
+diag<-readRDS("prop_A_K_dt_list_diag.rds") #new_setup_baseline_diagnosis.R
+biop<-readRDS("prop_A_K_dt_list_biop.rds") #new_setup_baseline_biopsy.R
+
+# table on the left
+diag
+
+# table on the right
+biop
+
+
+```
+
+## Combined table
+
+```{r comb-prop-diag}
+#| echo: false
+#| eval: true
+#| label: tbl-comb-prop-diag
+#| tbl-cap: All four cumulative proportions, with shared k value. The time zero is set on the advanced diagnosis date.
+
+#Print out the four tables of cumulative proportions in one table.
+
+
+gt_out_diag<-readRDS("gt_out_diag.rds")#new_setup_baseline_diagnosis.R
+
+gt_out_diag
+  
+```
+
+```{r comb-prop-biop}
+#| echo: false
+#| eval: true
+#| label: tbl-comb-prop-biop
+#| tbl-cap: All four cumulative proportions, with shared k value. The time zero is set on the 1st biopsy day on or after advanced diagnosis date.
+
+#Print out the four tables of cumulative proportions in one table.
+
+
+
+
+gt_out_biop<-readRDS("gt_out_biop.rds")#new_setup_baseline_biopsy.R
+
+gt_out_biop
+  
+```
+
+\
+
+# Pros and Cons for the two time zeros
+
+```{r pros-cons-table}
+#| echo: false
+#| eval: true
+#| label: tbl-pros-cons
+#| tbl-cap: Pros and cons of using different survival time zero
+#| tbl-colwidths: [10,50,40]
+
+#Table of pros and cons
+
+
+
+#When time zero is advanced diagnosis date
+
+#Input pros first
+pros_cons_diag<-
+data.table(
+  groups="Pros",
+  `Advanced diagnosis`="Observed for all patient")
+
+pros_cons_diag<-rbind(
+  pros_cons_diag,
+  data.table(
+  groups="Pros",
+  `Advanced diagnosis`="Well defined")
+)
+
+pros_cons_diag<-rbind(
+  pros_cons_diag,
+  data.table(
+  groups="Pros",
+  `Advanced diagnosis`="Goes with clinical understanding (according to Wally) that treating clinician performs biopsy to make advanced stage diagnosis, and that the clinician will make the decision to perform testing and wait/not wait for testing on the same day.")
+)
+
+
+pros_cons_diag<-rbind(
+  pros_cons_diag,
+  data.table(
+  groups="Cons",
+  `Advanced diagnosis`="Assume that the biopsy sample used for testing targetable mutation actaully occurred on the day of diagnosis. Flatiron includes people who meets: structured diagnosis for aNSCLC (ICD-9 162.x or ICD C34x or C39.9) and at least two documented clinical visits, on different days, occurring on or after January 1, 2011. When I Googled these ICD codes, they didn't seem to require biopsy. If I am correct, then this assumption that the biopsy occurs on the date of diagnosis is false.")
+)
+
+
+
+#When time zero is 1st biopsy on or after advanced diagnosis
+
+pros_cons_biop<-
+data.table(
+  groups="Pros",
+  `1st biopsy on or after diagnosis`="Evidence of biopsy actually occurred"
+)
+
+
+pros_cons_biop<-rbind(
+  pros_cons_biop,
+  data.table(
+  groups="Pros",
+  `1st biopsy on or after diagnosis`="Well defined")
+)
+
+pros_cons_biop<-rbind(
+  pros_cons_biop,
+  data.table(
+  groups="Cons",
+  `1st biopsy on or after diagnosis`="Many people missing time zero (N=28489)")
+)
+
+
+pros_cons_diag[,index:=1:.N,by=groups]
+pros_cons_diag[,groups:=paste(groups,index)]
+pros_cons_diag[,index:=NULL]
+
+pros_cons_biop[,index:=1:.N,by=groups]
+pros_cons_biop[,groups:=paste(groups,index)]
+pros_cons_biop[,index:=NULL]
+
+comb_dat<-merge(pros_cons_diag,pros_cons_biop,by="groups",all=T)
+comb_dat[is.na(`Advanced diagnosis`),`Advanced diagnosis`:=""]
+comb_dat[is.na(`1st biopsy on or after diagnosis`),`1st biopsy on or after diagnosis`:=""]
+
+setnames(comb_dat,"groups","Pros/Cons")
+kable(comb_dat)
+
+```
