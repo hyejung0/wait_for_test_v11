@@ -92,7 +92,7 @@ ggplot(this_df, mapping = aes(x=x, y=y))+
 
 ```
 
-If we are reporting the simple case, we are fixing $k=3$, where the risk difference is `r this_df$y[this_df$x==3]`.
+If we are reporting the simple case, we are fixing $k=3$, where the risk difference is `r this_df$y[this_df$x==3]`. That is, the incidence of death attribut
 
 
 \
