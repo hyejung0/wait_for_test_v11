@@ -79,18 +79,21 @@ Just like the example of heavy smokers, there are some patient characteristics t
 This study used the nationwide Flatiron Health electronic health record (EHR)-derived de-identified database. The Flatiron Health database is a longitudinal database, comprising de-identified patient-level structured and unstructured data, curated via technology-enabled abstraction [@ma2020comparison; @birnbaum2020model]. The de-identified data originated from 280 cancer clinics (~800 sites of care) . The study included 85,572 unique patients diagnosed with aNSCLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022. Patients with a BirthYear of 1937 or earlier may have an adjusted BirthYear in Flatiron datasets due to patient de-identification requirements. For more information, please refer to their webpage [@zhang2025].
 
 
-Patient attrition diagram is shown below.. It shows all exclusion criteria. We excluded all patients who start either the 1L therapy or valid test before time zero, which is advanced diagnosis date. We will explain what valid test means in the next section. 
+Patient attrition diagram is shown below. It shows all exclusion criteria. We excluded all patients who don't have valid survival end time and who start either the 1L therapy or valid test before advanced diagnosis date. We will explain what valid test means in the next section. 
 
 
+```{r pt_attrition, echo=FALSE, out.width='70%', fig.cap='Figure XX: Patient attrition diagram'}
 
-```{r pt_attrition, echo=FALSE, out.width='70%', fig.cap='Figure XX: Exclusion diagram'}
 
-
-knitr::include_graphics("patient_attrition_diagram.png")
+knitr::include_graphics("./SAP_v1_files/image/patient_attrition_diagram.png")
 
 ```
 
 
+\
 
+## Valid targetable mutation test or PDL1 test
+
+The point of conducting this analysis is whether proceeding to provide 1L therapy before knowledge of PDL1 expression level or targetable mutation status would impact the survival. Thus, valid PDL1 test refers to test results with non-missing PDL1 expression level. Targetable mutation means mutation status of 
 
 

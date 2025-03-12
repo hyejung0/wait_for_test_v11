@@ -1,10 +1,12 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Wed Mar 12, 2025 01:55:46 PM
+Wed Mar 12, 2025 02:05:07 PM
 
 - [Hypothesis](#hypothesis)
 - [Data](#data)
+  - [Valid targetable mutation test or PDL1
+    test](#valid-targetable-mutation-test-or-pdl1-test)
 
   
 
@@ -60,19 +62,30 @@ from 01 January 2011, to 30 December 2022. Patients with a BirthYear of
 to patient de-identification requirements. For more information, please
 refer to their webpage<sup>3</sup>.
 
-Patient attrition diagram is shown below.. It shows all exclusion
-criteria. We excluded all patients who start either the 1L therapy or
-valid test before time zero, which is advanced diagnosis date. We will
-explain what valid test means in the next section.
+Patient attrition diagram is shown below. It shows all exclusion
+criteria. We excluded all patients who don’t have valid survival end
+time and who start either the 1L therapy or valid test before advanced
+diagnosis date. We will explain what valid test means in the next
+section.
 
 <div class="figure">
 
-<img src="patient_attrition_diagram.png" alt="Figure XX: Exclusion diagram" width="70%" />
+<img src="./SAP_v1_files/image/patient_attrition_diagram.png" alt="Figure XX: Patient attrition diagram" width="70%" />
 <p class="caption">
-Figure XX: Exclusion diagram
+Figure XX: Patient attrition diagram
 </p>
 
 </div>
+
+  
+
+## Valid targetable mutation test or PDL1 test
+
+The point of conducting this analysis is whether proceeding to provide
+1L therapy before knowledge of PDL1 expression level or targetable
+mutation status would impact the survival. Thus, valid PDL1 test refers
+to test results with non-missing PDL1 expression level. Targetable
+mutation means mutation status of
 
 <div id="refs" class="references csl-bib-body" entry-spacing="0"
 line-spacing="2">
