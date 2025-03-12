@@ -1,0 +1,58 @@
+---
+title: "Statistical Analysis Plan"
+subtitle: "version 1"
+author: "Hyejung Lee <hyejung.lee@utah.edu>"
+date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    html_preview: true
+  html_document:
+    code_folding: NULL
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    theme: readable
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+---
+
+
+
+```{r include=FALSE}
+#| message: false
+#| warning: false
+
+library(ggplot2)
+library(officer)
+library(officedown)
+library(flextable)
+library(data.table)
+library(parallel)
+library(kableExtra)
+library(knitr)
+library(lubridate)
+library(tictoc)
+library(gt)
+knitr::opts_chunk$set(echo = FALSE)
+
+
+
+ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+
+
+```
+
+
+
+\
+
+
+# Hypothesis
+
+
+Advanced non-small cell lung cancer patients' recommended course of treatments are identified in National Comprehensive Cancer Network (NCCN) guideline. The guideline suggests each patient to perform biopsy to identify presence of targetable mutations of certain biomarkers and PDL1 expression to make a informed decision on 1L therapy choice. 
+
+However, the standard guideline may not always be followed due to reasons such as clinician's expert knowledge and ethics. For example, patients with heavy smoking habits mostly develop NSCLC by smoking without any targetable mutation. In this case, chemotherapy alone can be used or if PDL1 expression level is available, any combination of chemotherapy and immunotherapy may be applied. The choice to proceeding to 1L without checking for targetable mutation or PDL1 expression arises due to the fact that a complete panel of tests for biomarkers and PDL1 expression takes 2 to 3 weeks on average. It may take longer if the biopsy samples were not good and the test results are indeterminiate, requiring another round of biopsy and waiting for the result. This period of waiting without doing any treatment may be detrimental to patient's health and thus becomes an ethicial issue. Therefore, the ultimate choice of whether waiting for the test result or not relies heavily on 
