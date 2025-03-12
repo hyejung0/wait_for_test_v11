@@ -17,6 +17,8 @@ output:
     toc_float:
       collapsed: false
       smooth_scroll: false
+bibliography: references.bib
+csl: nature.csl
 ---
 
 
@@ -24,6 +26,8 @@ output:
 ```{r include=FALSE}
 #| message: false
 #| warning: false
+
+# knitr::opts_knit$set(root.dir = "./SAP")
 
 library(ggplot2)
 library(officer)
@@ -36,6 +40,14 @@ library(knitr)
 library(lubridate)
 library(tictoc)
 library(gt)
+
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+library(knitr)
+
+
+
 knitr::opts_chunk$set(echo = FALSE)
 
 
@@ -53,6 +65,32 @@ ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the envi
 # Hypothesis
 
 
-Advanced non-small cell lung cancer patients' recommended course of treatments are identified in National Comprehensive Cancer Network (NCCN) guideline. The guideline suggests each patient to perform biopsy to identify presence of targetable mutations of certain biomarkers and PDL1 expression to make a informed decision on 1L therapy choice. 
+Advanced non-small cell lung cancer (aNSCLC) patients' recommended course of treatments are identified in National Comprehensive Cancer Network (NCCN) guideline. The guideline suggests each patient to perform biopsy to identify presence of targetable mutations of certain biomarkers and PDL1 expression to make a informed decision on 1L therapy choice. This recommendation is made because targeted therapy is better for patient's survival than a standard, generic therapy such as chemotherapy or immunotherapy.
 
-However, the standard guideline may not always be followed due to reasons such as clinician's expert knowledge and ethics. For example, patients with heavy smoking habits mostly develop NSCLC by smoking without any targetable mutation. In this case, chemotherapy alone can be used or if PDL1 expression level is available, any combination of chemotherapy and immunotherapy may be applied. The choice to proceeding to 1L without checking for targetable mutation or PDL1 expression arises due to the fact that a complete panel of tests for biomarkers and PDL1 expression takes 2 to 3 weeks on average. It may take longer if the biopsy samples were not good and the test results are indeterminiate, requiring another round of biopsy and waiting for the result. This period of waiting without doing any treatment may be detrimental to patient's health and thus becomes an ethicial issue. Therefore, the ultimate choice of whether waiting for the test result or not relies heavily on 
+However, the standard guideline may not always be followed due to reasons such as clinician's expert knowledge and ethics. For example, patients with heavy smoking habits mostly develop NSCLC by smoking without any targetable mutation. In this case, chemotherapy alone can be used or if PDL1 expression level is available, any combination of chemotherapy and immunotherapy may be applied. The choice to proceeding to 1L without checking for targetable mutation or PDL1 expression arises due to the fact that a complete panel of tests for biomarkers and PDL1 expression takes 2 to 3 weeks on average. It may take longer if the biopsy samples were not good and the test results are indeterminate, requiring another round of biopsy and waiting for the result. This period of waiting without doing any treatment may be detrimental to patient's health and thus becomes an ethical issue. Therefore, the ultimate choice of whether waiting for the test result or not relies heavily on the clinician's decision. 
+
+Just like the example of heavy smokers, there are some patient characteristics that are highly indicative of patient's likelihood of targetable mutation status. However, there has not yet been a quantitative evaluation of effect of proceeding to 1L therapy prior to knowing targetable mutation status in patients. In this study, we evaluate causal effect of proceeding right 1L therapy in all aNSCLC patients, as well as in some subgroups that have previously been identified as associated with the mutation status. 
+
+
+\
+
+# Data
+
+This study used the nationwide Flatiron Health electronic health record (EHR)-derived de-identified database. The Flatiron Health database is a longitudinal database, comprising de-identified patient-level structured and unstructured data, curated via technology-enabled abstraction [@ma2020comparison; @birnbaum2020model]. The de-identified data originated from 280 cancer clinics (~800 sites of care) . The study included 85,572 unique patients diagnosed with aNSCLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022. Patients with a BirthYear of 1937 or earlier may have an adjusted BirthYear in Flatiron datasets due to patient de-identification requirements. For more information, please refer to their webpage [@zhang2025].
+
+
+Patient attrition diagram  is shown in \ref{fig:pt_attrition}. It shows all exclusion criteria. We excluded all patients who start either the 1L therapy or valid test before time zero, which is advanced diagnosis date. We will explain what valid test means in the next section. 
+
+
+
+```{r pt_attrition, echo=FALSE,out.width='25%', fig.align='center', fig.cap='exclusion diagram'}
+
+
+knitr::include_graphics("patient_attrition_diagram.pdf")
+
+```
+
+
+
+
+
