@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Wed Mar 12, 2025 01:20:43 PM
+Wed Mar 12, 2025 01:55:46 PM
 
 - [Hypothesis](#hypothesis)
 - [Data](#data)
@@ -60,16 +60,16 @@ from 01 January 2011, to 30 December 2022. Patients with a BirthYear of
 to patient de-identification requirements. For more information, please
 refer to their webpage<sup>3</sup>.
 
-Patient attrition diagram is shown in . It shows all exclusion criteria.
-We excluded all patients who start either the 1L therapy or valid test
-before time zero, which is advanced diagnosis date. We will explain what
-valid test means in the next section.
+Patient attrition diagram is shown below.. It shows all exclusion
+criteria. We excluded all patients who start either the 1L therapy or
+valid test before time zero, which is advanced diagnosis date. We will
+explain what valid test means in the next section.
 
-<div class="figure" style="text-align: center">
+<div class="figure">
 
-<embed src="patient_attrition_diagram.pdf" title="exclusion diagram" width="25%" type="application/pdf" />
+<img src="patient_attrition_diagram.png" alt="Figure XX: Exclusion diagram" width="70%" />
 <p class="caption">
-exclusion diagram
+Figure XX: Exclusion diagram
 </p>
 
 </div>
