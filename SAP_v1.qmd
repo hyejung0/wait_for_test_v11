@@ -1,0 +1,149 @@
+---
+title: "Statistical Analysis Plan"
+subtitle: "version 1"
+date: today
+format:
+  html:
+    css: aside_left_margin.css
+    #self-contained: true 
+    embed-resources: true
+    code-fold: true
+    toc: true
+    number-sections: true
+# execute:
+  # cache: true
+editor_options:
+  chunk_output_type: console
+indent: true
+indenting: "medium"
+editor: 
+  markdown: 
+    wrap: 72
+bibliography: references.bib
+csl: american-association-for-cancer-research.csl
+---
+
+
+
+```{r include=FALSE}
+#| message: false
+#| warning: false
+
+library(ggplot2)
+library(officer)
+library(officedown)
+library(flextable)
+library(data.table)
+library(parallel)
+library(kableExtra)
+library(knitr)
+library(lubridate)
+library(tictoc)
+library(gt)
+knitr::opts_chunk$set(echo = FALSE)
+
+
+
+ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+
+
+```
+
+
+
+\
+
+
+# Hypothesis
+
+
+Advanced non-small cell lung cancer patients' recommended course of treatments are identified in national cancer .... (NCCN) guideline. The guideline suggests each patient to perform biopsy to identify presence of targetable mutations of certain biomarkers and PDL1 expression to make a informed decision on 1L therapy choice. 
+
+However, the standard guideline may not always be followed due to reasons such as clinician's expert knowledge and ethics. For example, patients with heavy smoking habits mostly develop NSCLC by smoking without any targetable mutation. In this case, chemotherapy alone can be used or if PDL1 expression level is available, any combination of chemotherapy and immunotherapy may be applied 
+
+
+Combination of chemotherapy or immunotherapy is used for this type of patients in case  chemotherapy is used in absence of PDL1   That is, there usually no targetable mutation, and the PDL1 expression is not useful for treatment. 
+In this analysis, we want to estimate the effect of treating advanced non-small cell lung cancer (aNSCLC) patients with 1L therapy without valid PDL1 status or valid targetable mutation status on survival. 
+
+Unfortunately, we do not have clinical trial data where we can derive the causal impact of waiting for 
+
+The standard practice requires either 1 positive mutation status or 2 negative mutation status of biomarkers (ALK, EGFR, BRAF, KRAS, MET, RET, ROS1, NTRK), and percent expression for PDL1 to make informed decision of 1L therapy. In reality, we use certain combination of PDL1 expression and valid gene therapy result but for our simplified version, we will simplify the case so that when a patient observes either a valid targetable mutation status OR valid PDL1 status, then the patient has enough information to inform more precise choice of 1L therapy. Thus, patients who do not have both the PDL1 expression and targetable mutationt status are 
+
+Note: The "valid test" is the one where test result indicating negative or
+positive for targetable mutations or PD1L expression. This information
+is provided in the dataset in the "BiomarkerStatus" column. If the
+column has any one of the following entries, the observation is
+considered valid.:
+
+[Check with Wally if the followings are to be used:]{.aside} [- No
+interpretation given in report]{.aside} [- Unsuccessful_indeterminate
+test]{.aside} [- Unknown]{.aside} [- Variant of Unknown Significance
+(VUS) positive]{.aside} [- Results pending]{.aside} [-
+Equivocal]{.aside} [- Other result type positive]{.aside} [- Unknown
+result type positive]{.aside} [- PD-L1 equivocal]{.aside}
+
+-   Mutation positive
+
+-   PD-L1 positive
+
+-   Rearrangement present
+
+-   Rearrangement positive
+
+-   Amplification positive
+
+-   Protein expression positive
+
+-   PD-L1 positive
+
+-   Mutation negative
+
+-   Negative
+
+-   PD-L1 negative/not detected
+
+-   Rearrangement not present
+
+There are ways to answer this question.
+
+1.  Simple case: fix the maximum time people are allowed to wait to make
+    the inference. For example, what is the effect of proceeding
+    immediately to 1L within the first 3 weeks since time zero? We would
+    estimate risk difference, which is additional survival
+    benefit/drawback caused by proceeding immediately to 1L therapy,
+    given that patient proceeded immediately to 1L therapy within the
+    first 3 weeks. We can change the number of weeks and report causal
+    risk difference in a plot in a mock figure @fig-mock_result
+2.  general case: do not restrain the number of weeks the 1L therapy
+    needs to be initiated by. That is, what is the effect of proceeding
+    immediately to 1L? We would estimate risk difference, which is
+    additional survival benefit/drawback caused by proceeding
+    immediately to 1L therapy.
+
+
+```{r fig.show="hold", fig.width=6, fig.height=6}
+#| label: fig-mock_result
+#| code-fold: true
+#| echo: false
+#| warning: false
+#| fig-cap: Mock graph of the result
+
+
+#generate mock result
+
+this_df<-data.table(
+  y=c(0.2,0.1,0.05,0.045,0.040,0.018),
+  x=0:5
+)
+this_df<-data.frame(this_df)
+ggplot(this_df, mapping = aes(x=x, y=y))+
+  geom_line()+
+  geom_point()+
+  ylab("Risk difference")+
+  xlab("Week (k) from time zero")
+
+```
+
+
+\
+
