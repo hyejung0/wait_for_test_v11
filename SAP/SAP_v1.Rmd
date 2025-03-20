@@ -102,7 +102,7 @@ Retrospective Cohort Study
 
 Patient attrition diagram is shown below. It shows all exclusion criteria. We excluded all patients who don't have valid survival end time and who start either the 1L therapy or valid test before advanced diagnosis date. We will explain what valid test means in the next section.
 
-```{r pt_attrition, echo=FALSE, out.width='70%', fig.cap='Figure XX: Patient attrition diagram'}
+```{r pt_attrition, out.width='70%', fig.cap='Figure XX: Patient attrition diagram'}
 
 
 knitr::include_graphics("./image/patient_attrition_diagram.png")
@@ -162,11 +162,11 @@ replicated_df[7:9,cohort:=1]
 
 setnames(replicated_df,"PatientID","Patient ID")
 
-# knitr::kable(replicated_df,
-#              caption =  "Table 1. Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time." )
+knitr::kable(replicated_df,
+             caption =  "Table 1. Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time." )
 
-flextable(replicated_df) |> 
-  set_caption("Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time.")
+# flextable(replicated_df) |> 
+#   set_caption("Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time.")
 
 
 ```
@@ -180,7 +180,8 @@ flextable(replicated_df) |>
 ## Directed acyclic graph (DAG)
 
 
-```{r fig-DAG,echo=FALSE, out.width='70%',  fig.cap="Figure XX: Directed acyclic graph. Y refers to survival outcome, A's refer to time-dependent cohort status, L's refer to time-dependent measured confounders, and U's refer to time-dependent unmeasured confounders. Index 0 is the baseline measruement. Thus, L0 contains variable such as gender and race/ethnicity. L1 then has a subset of variables of L0, where only time-varying variables are contained. The time index (k) goes from 1 through K_i, where i refers to a patient. Each patient has different number of weeks of follow-up until censored or dead."}
+```{r fig-DAG, out.width='70%',  fig.cap="Figure XX: Directed acyclic graph. Y refers to survival outcome, A's refer to time-dependent cohort status, L's refer to time-dependent measured confounders, and U's refer to time-dependent unmeasured confounders. Index 0 is the baseline measruement. Thus, L0 contains variable such as gender and race/ethnicity. L1 then has a subset of variables of L0, where only time-varying variables are contained. The time index (k) goes from 1 through K_i, where i refers to a patient. Each patient has different number of weeks of follow-up until censored or dead."}
+
 knitr::include_graphics("./image/DAG.jpg")
 
 ```
@@ -326,14 +327,6 @@ kable(baseline_cov2)
 
 
 
-
-```{r}
-
-
-
-
-
-```
 
 
 

@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Thu Mar 20, 2025 12:02:42 PM
+Thu Mar 20, 2025 02:02:59 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -169,7 +169,23 @@ the dataset.
 
   
 
-<img src="SAP_v1_files/figure-gfm/tbl-long_dat_example-1.png" width="1181" />
+| Patient ID |   k | Gender | SmokingStatus      |  Albumin | Platelet | cohort |
+|:-----------|----:|:-------|:-------------------|---------:|---------:|-------:|
+| A          |   0 | M      | History of smoking | 37.20139 |      214 |      0 |
+| A          |   1 | M      | History of smoking | 17.87623 |      210 |      0 |
+| A          |   2 | M      | History of smoking | 37.51583 |      198 |      0 |
+| B          |   0 | M      | History of smoking | 29.80779 |      236 |      0 |
+| B          |   1 | M      | History of smoking | 41.01908 |      262 |      0 |
+| B          |   2 | M      | History of smoking | 52.88518 |      257 |      0 |
+| B          |   3 | M      | History of smoking | 35.94656 |      262 |      1 |
+| B          |   4 | M      | History of smoking | 40.00766 |      302 |      1 |
+| B          |   5 | M      | History of smoking | 44.05353 |      283 |      1 |
+
+Table 1. Example dataset: An expected sample of the dataset for the
+baseline and follow-up variables for two patients. Gender and smoking
+status are baseline covariates that do not change over time. Albumin and
+Platelet are the tiem-dependent covariates that are measured each week
+(k). Cohort is the exposure variables that can change over time.
 
   
 
