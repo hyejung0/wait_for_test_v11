@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Wed Mar 19, 2025 06:37:49 PM
+Thu Mar 20, 2025 12:02:42 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -128,7 +128,7 @@ section.
 
 <div class="figure">
 
-<img src="./SAP_v1_files/image/patient_attrition_diagram.png" alt="Figure XX: Patient attrition diagram" width="70%" />
+<img src="./image/patient_attrition_diagram.png" alt="Figure XX: Patient attrition diagram" width="70%" />
 <p class="caption">
 Figure XX: Patient attrition diagram
 </p>
@@ -169,29 +169,32 @@ the dataset.
 
   
 
-| PatientID |   k | Gender | SmokingStatus      |  Albumin | Platelet | cohort |
-|:----------|----:|:-------|:-------------------|---------:|---------:|-------:|
-| A         |   0 | M      | History of smoking | 37.20139 |      214 |      0 |
-| A         |   1 | M      | History of smoking | 17.87623 |      210 |      0 |
-| A         |   2 | M      | History of smoking | 37.51583 |      198 |      0 |
-| B         |   0 | M      | History of smoking | 29.80779 |      236 |      0 |
-| B         |   1 | M      | History of smoking | 41.01908 |      262 |      0 |
-| B         |   2 | M      | History of smoking | 52.88518 |      257 |      0 |
-| B         |   3 | M      | History of smoking | 35.94656 |      262 |      1 |
-| B         |   4 | M      | History of smoking | 40.00766 |      302 |      1 |
-| B         |   5 | M      | History of smoking | 44.05353 |      283 |      1 |
-
-Table 1. Example dataset: An expected sample of the dataset for the
-baseline and follow-up variables for two patients. Gender and smoking
-status are baseline covariates that do not change over time. Albumin and
-Platelet are the tiem-dependent covariates that are measured each week
-(k). Cohort is the exposure variables that can change over time.
+<img src="SAP_v1_files/figure-gfm/tbl-long_dat_example-1.png" width="1181" />
 
   
 
 # Cohort
 
 ## Directed acyclic graph (DAG)
+
+<div class="figure">
+
+<img src="./image/DAG.jpg" alt="Figure XX: Directed acyclic graph. Y refers to survival outcome, A's refer to time-dependent cohort status, L's refer to time-dependent measured confounders, and U's refer to time-dependent unmeasured confounders. Index 0 is the baseline measruement. Thus, L0 contains variable such as gender and race/ethnicity. L1 then has a subset of variables of L0, where only time-varying variables are contained. The time index (k) goes from 1 through K_i, where i refers to a patient. Each patient has different number of weeks of follow-up until censored or dead." width="70%" />
+<p class="caption">
+Figure XX: Directed acyclic graph. Y refers to survival outcome, A’s
+refer to time-dependent cohort status, L’s refer to time-dependent
+measured confounders, and U’s refer to time-dependent unmeasured
+confounders. Index 0 is the baseline measruement. Thus, L0 contains
+variable such as gender and race/ethnicity. L1 then has a subset of
+variables of L0, where only time-varying variables are contained. The
+time index (k) goes from 1 through K_i, where i refers to a patient.
+Each patient has different number of weeks of follow-up until censored
+or dead.
+</p>
+
+</div>
+
+@ref{fig-DAG}
 
   
 
@@ -206,33 +209,33 @@ Platelet are the tiem-dependent covariates that are measured each week
 | Race/Ethnicity | A single variable derived by pasting Race (Asian, Black or African American, Hispanic or Latino, White, Other Race) and Ethnicity (Not Hispanic or Latino, Hispanic or Latino) variables. |
 | Smoking Status | Smoking status of patient (History, no history, unknown) (from Enhanced_AdvancedNSCLC.csv file). |
 | Histology | Squamous cell carcinoma, Non-squamous cell carcinoma, NSCLC histology NOS (from Enhanced_AdvancedNSCLC.csv file) |
-| BMI | Body mass index (kg/m^2) (from Vitals.csv file) |
+| BMI | Body mass index (kg\_\_m^2) (from Vitals.csv file) |
 | ECOG score | Eastern Cooperative Oncology Group score, ranging from 0 to 4. (from ECOG.csv file) |
 | Complete metabolic panel (CMP) | Lab measurement of following analytes: Albumin, Alkaline, ALT, Bilirubin, Calcium, Chloride, Creatinine, eGFR, Potassium, Protein, Sodium. Each of these variables are to be defined below. (from Lab.csv file) |
-| Albumin | albumin \[mass/volume\] in serum or plasma measrued in g/L |
-| Alkaline | alkaline phosphatase \[enzymatic activity/volume\] in serum or plasma measrued in U/L |
-| ALT | alanine aminotransferase \[enzymatic activity/volume\] in serum or plasma measrued in U/L |
-| AST | aspartate aminotransferase \[enzymatic activity/volume\] in serum or plasma measrued in U/L |
-| Bilirubin | bilirubin.total \[mass/volume\] in serum or plasma measrued in mg/dL |
-| Calcium | calcium \[mass/volume\] in serum or plasma measrued in mg/dL |
-| Carbon dioxide | carbon dioxide, total \[moles/volume\] in serum or plasma measrued in mmol/L |
-| Chloride | chloride \[moles/volume\] in serum or plasma measrued in mmol/L |
-| Creatinine | creatinine \[mass/volume\] in serum or plasma measrued in mg/dL |
-| Glucose | glucose \[mass/volume\] in serum or plasma measrued in mg/dL |
-| Potassium | potassium \[moles/volume\] in serum or plasma measrued in mmol/L |
-| Protein | protein \[mass/volume\] in serum or plasma measrued in g/L |
-| Sodium | sodium \[moles/volume\] in serum or plasma measrued in mmol/L |
-| eGFR_mdrd | glomerular filtration rate predicted \[volume rate/area\] in serum, plasma or blood by creatinine-based formula (mdrd), measrued in ml/min/1.73m\*2. Some observations specificially state that the values are precited among non-blacks, blacks, or females mutually exclusively. |
-| eGFR_ckd_epi | glomerular filtration rate predicted \[volume rate/area\] in serum, plasma or blood, measrued in ml/min/1.73m\*2. Some observations specify whether the test as creatinine-based formula (ckd-epi), creatinine-based formula (ckd-epi 2021), or cystatin c-based formula. Also, some observations people specificially states whether the values are precited among non-blacks or blacks, mutually exclusively. |
+| Albumin | albumin \[mass\_\_volume\] in serum or plasma measrued in g\_\_L |
+| Alkaline | alkaline phosphatase \[enzymatic activity\_\_volume\] in serum or plasma measrued in U\_\_L |
+| ALT | alanine aminotransferase \[enzymatic activity\_\_volume\] in serum or plasma measrued in U\_\_L |
+| AST | aspartate aminotransferase \[enzymatic activity\_\_volume\] in serum or plasma measrued in U\_\_L |
+| Bilirubin | bilirubin.total \[mass\_\_volume\] in serum or plasma measrued in mg\_\_dL |
+| Calcium | calcium \[mass\_\_volume\] in serum or plasma measrued in mg\_\_dL |
+| Carbon dioxide | carbon dioxide, total \[moles\_\_volume\] in serum or plasma measrued in mmol\_\_L |
+| Chloride | chloride \[moles\_\_volume\] in serum or plasma measrued in mmol\_\_L |
+| Creatinine | creatinine \[mass\_\_volume\] in serum or plasma measrued in mg\_\_dL |
+| Glucose | glucose \[mass\_\_volume\] in serum or plasma measrued in mg\_\_dL |
+| Potassium | potassium \[moles\_\_volume\] in serum or plasma measrued in mmol\_\_L |
+| Protein | protein \[mass\_\_volume\] in serum or plasma measrued in g\_\_L |
+| Sodium | sodium \[moles\_\_volume\] in serum or plasma measrued in mmol\_\_L |
+| eGFR_mdrd | glomerular filtration rate predicted \[volume rate\_\_area\] in serum, plasma or blood by creatinine-based formula (mdrd), measrued in ml\_\_min\_\_1.73m\*2. Some observations specificially state that the values are precited among non-blacks, blacks, or females mutually exclusively. |
+| eGFR_ckd_epi | glomerular filtration rate predicted \[volume rate\_\_area\] in serum, plasma or blood, measrued in ml\_\_min\_\_1.73m\*2. Some observations specify whether the test as creatinine-based formula (ckd-epi), creatinine-based formula (ckd-epi 2021), or cystatin c-based formula. Also, some observations people specificially states whether the values are precited among non-blacks or blacks, mutually exclusively. |
 | Categorical CMP | Categorical version of the above…. Should we do this? I won’t for now. |
 | Complete Blood Panel (CBP) | lab measurement of following analytes: RBC, WBC, HCT, HGB, Platelet, Lymphocyte \#, Neutrophil \#. Each of these variables are to be defined below. (from Lab.csv file) |
 | HCT | hematocrit \[volume fraction\] of blood measrued in % |
-| HGB | hemoglobin \[mass/volume\] in blood measrued in g/dL |
-| Lymphocyte \# | lymphocytes \[#/volume\] in blood measrued in 10\*9/L |
-| Neutrophil \# | neutrophils \[#/volume\] in blood measrued in 10\*9/L |
-| Platelet | platelets \[#/volume\] in blood measrued in 10\*9/L |
-| RBC | erythrocytes \[#/volume\] in blood measrued in 10\*12/L |
-| WBC | leukocytes \[#/volume\] in blood measrued in 10\*9/L |
+| HGB | hemoglobin \[mass\_\_volume\] in blood measrued in g\_\_dL |
+| Lymphocyte \# | lymphocytes \[#\_\_volume\] in blood measrued in 10\*9\_\_L |
+| Neutrophil \# | neutrophils \[#\_\_volume\] in blood measrued in 10\*9\_\_L |
+| Platelet | platelets \[#\_\_volume\] in blood measrued in 10\*9\_\_L |
+| RBC | erythrocytes \[#\_\_volume\] in blood measrued in 10\*12\_\_L |
+| WBC | leukocytes \[#\_\_volume\] in blood measrued in 10\*9\_\_L |
 | Categorical CBP | Categorical version of the above…. Should we do this? I won’t for now. |
 
 - Gender: Demographics.csv/Gender
@@ -275,39 +278,41 @@ Platelet are the tiem-dependent covariates that are measured each week
 
 | variable                       | Overall (n=) | Wait (n=) | Do not wait (n=) |
 |:-------------------------------|:-------------|:----------|:-----------------|
-| Gender                         | NA           | NA        | NA               |
-| Age                            | NA           | NA        | NA               |
-| Race/Ethnicity                 | NA           | NA        | NA               |
-| Smoking Status                 | NA           | NA        | NA               |
-| Histology                      | NA           | NA        | NA               |
-| BMI                            | NA           | NA        | NA               |
-| ECOG score                     | NA           | NA        | NA               |
-| Complete metabolic panel (CMP) | NA           | NA        | NA               |
-| Albumin                        | NA           | NA        | NA               |
-| Alkaline                       | NA           | NA        | NA               |
-| ALT                            | NA           | NA        | NA               |
-| AST                            | NA           | NA        | NA               |
-| Bilirubin                      | NA           | NA        | NA               |
-| Calcium                        | NA           | NA        | NA               |
-| Carbon dioxide                 | NA           | NA        | NA               |
-| Chloride                       | NA           | NA        | NA               |
-| Creatinine                     | NA           | NA        | NA               |
-| Glucose                        | NA           | NA        | NA               |
-| Potassium                      | NA           | NA        | NA               |
-| Protein                        | NA           | NA        | NA               |
-| Sodium                         | NA           | NA        | NA               |
-| eGFR_mdrd                      | NA           | NA        | NA               |
-| eGFR_ckd_epi                   | NA           | NA        | NA               |
-| Categorical CMP                | NA           | NA        | NA               |
-| Complete Blood Panel (CBP)     | NA           | NA        | NA               |
-| HCT                            | NA           | NA        | NA               |
-| HGB                            | NA           | NA        | NA               |
-| Lymphocyte \#                  | NA           | NA        | NA               |
-| Neutrophil \#                  | NA           | NA        | NA               |
-| Platelet                       | NA           | NA        | NA               |
-| RBC                            | NA           | NA        | NA               |
-| WBC                            | NA           | NA        | NA               |
-| Categorical CBP                | NA           | NA        | NA               |
+| Gender                         |              |           |                  |
+| Age                            |              |           |                  |
+| Race/Ethnicity                 |              |           |                  |
+| Smoking Status                 |              |           |                  |
+| Histology                      |              |           |                  |
+| BMI                            |              |           |                  |
+| ECOG score                     |              |           |                  |
+| Complete metabolic panel (CMP) |              |           |                  |
+| Albumin                        |              |           |                  |
+| Alkaline                       |              |           |                  |
+| ALT                            |              |           |                  |
+| AST                            |              |           |                  |
+| Bilirubin                      |              |           |                  |
+| Calcium                        |              |           |                  |
+| Carbon dioxide                 |              |           |                  |
+| Chloride                       |              |           |                  |
+| Creatinine                     |              |           |                  |
+| Glucose                        |              |           |                  |
+| Potassium                      |              |           |                  |
+| Protein                        |              |           |                  |
+| Sodium                         |              |           |                  |
+| eGFR_mdrd                      |              |           |                  |
+| eGFR_ckd_epi                   |              |           |                  |
+| Categorical CMP                |              |           |                  |
+| Complete Blood Panel (CBP)     |              |           |                  |
+| HCT                            |              |           |                  |
+| HGB                            |              |           |                  |
+| Lymphocyte \#                  |              |           |                  |
+| Neutrophil \#                  |              |           |                  |
+| Platelet                       |              |           |                  |
+| RBC                            |              |           |                  |
+| WBC                            |              |           |                  |
+| Categorical CBP                |              |           |                  |
+
+Table1: Mock table demonstrating format of reporting proportion missing.
 
 # Key variables
 
