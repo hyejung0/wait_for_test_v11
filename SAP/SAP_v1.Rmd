@@ -78,6 +78,7 @@ Just like the example of heavy smokers, there are some patient characteristics t
 
 This study used the nationwide Flatiron Health electronic health record (EHR)-derived de-identified database. The Flatiron Health database is a longitudinal database, comprising de-identified patient-level structured and unstructured data, curated via technology-enabled abstraction [@ma2020comparison; @birnbaum2020model]. The de-identified data originated from 280 cancer clinics (~800 sites of care) . The study included 85,572 unique patients diagnosed with aNSCLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022. Patients with a BirthYear of 1937 or earlier may have an adjusted BirthYear in Flatiron datasets due to patient de-identification requirements. For more information, please refer to their webpage [@zhang2025].
 
+We restricted our cohort to patients who did not start 1L therapy before official diagnosis advanced stage and did not receive any valid test result for PDL1 expression and 
 
 Patient attrition diagram is shown below. It shows all exclusion criteria. We excluded all patients who don't have valid survival end time and who start either the 1L therapy or valid test before advanced diagnosis date. We will explain what valid test means in the next section. 
 
@@ -94,6 +95,44 @@ knitr::include_graphics("./SAP_v1_files/image/patient_attrition_diagram.png")
 
 ## Valid targetable mutation test or PDL1 test
 
-The point of conducting this analysis is whether proceeding to provide 1L therapy before knowledge of PDL1 expression level or targetable mutation status would impact the survival. Thus, valid PDL1 test refers to test results with non-missing PDL1 expression level. Targetable mutation means mutation status of 
+The point of conducting this analysis is whether proceeding to provide 1L therapy before knowledge of PDL1 expression level or targetable mutation status would impact the survival. Thus, valid PDL1 test refers to test results with non-missing PDL1 expression level in the dataset.[ PDL1 expression levels indicate patient's susceptibility to immumotherapy, with higher percentage indicating immunotherapy will work well on the patient.]{style="color:red;"}
 
+On the other hand for the targetable mutation, we have 8 different biomarkers for which we can test for mutation. They are:ALK, EGFR, BRAF, KRAS, MET, RET, ROS1, and NTRK. Clinicians typically find it useful to have at least 1 positive mutation or 2 negative mutations to make informed 1L therapy decision. Thus, any patient who have either 1 positive mutation or 2 negative mutation results are considered to have valid targetable mutation result. We identified a biomarker to be mutation positive if it had any one of the following entries in "BiomarkerStatus" column. :
+
+-   Mutation positive
+
+-   PD-L1 positive
+
+-   Rearrangement present
+
+-   Rearrangement positive
+
+-   Amplification positive
+
+-   Protein expression positive
+
+-   PD-L1 positive
+
+Similarly, we identified a biomarker to be mutation negative if it had any one of the following entries in the same column. :
+
+-   Mutation negative
+
+-   Negative
+
+-   PD-L1 negative/not detected
+
+-   Rearrangement not present
+
+
+
+
+
+\
+
+## cohort 
+
+In our analysis, we assess impact of proceeding to 1L therapy without either valid PDL result or targetable mutation result. Here, we identify two cohorts. First cohort is those who proceeded to 1L therapy before either valid PDL1 or targetable mutation result were observed. Second cohort is those who received 1L therapy after observing either valid PDL1 or targetable mutation result. Therefore, cohort is a function of time from time zero until either valid PDL1 or targetable mutation result date and 1L therapy start date. 
+
+
+That is, if a patient has a record of 1L before either valid PDL1 or targetable mutation result, then the patient is identified as a 
 
