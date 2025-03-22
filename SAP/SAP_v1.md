@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Thu Mar 20, 2025 02:02:59 PM
+Sat Mar 22, 2025 05:37:09 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -128,7 +128,7 @@ section.
 
 <div class="figure">
 
-<img src="./image/patient_attrition_diagram.png" alt="Figure XX: Patient attrition diagram" width="70%" />
+<img src="./image/patient_attrition_diagram.jpg" alt="Figure XX: Patient attrition diagram" width="70%" />
 <p class="caption">
 Figure XX: Patient attrition diagram
 </p>
@@ -211,6 +211,21 @@ or dead.
 </div>
 
 @ref{fig-DAG}
+
+We define time-varying cohort variable at each $k$ for a patient as
+follows. For simplicity, we will drop $i$ in $K_i$ without loss of
+generality. :
+
+- $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is week
+  when death/censoring occurs.
+- Define earliest valid test result date as the date when any one of 1)
+  PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
+  mutations was made available to the clinician.
+- $C_k = min \{\text{end of week $k$, earliest valid test result date} \}$
+- $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
+
+In a plane language, we have two cohorts for each time interval $k$. One
+cohort is the patient who has $A_k=0$, where 1L was
 
   
 
