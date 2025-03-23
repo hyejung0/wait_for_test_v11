@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Sat Mar 22, 2025 05:37:09 PM
+Sat Mar 22, 2025 07:14:09 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -11,10 +11,16 @@ Sat Mar 22, 2025 05:37:09 PM
 - [Data Strucutre](#data-strucutre)
 - [Cohort](#cohort)
   - [Directed acyclic graph (DAG)](#directed-acyclic-graph-dag)
+- [Outcome](#outcome)
+- [Covariates](#covariates)
+  - [Baseline (45 variables)](#baseline-45-variables)
+  - [Time-varying (40 variables)](#time-varying-40-variables)
+- [Statistical analysis](#statistical-analysis)
 - [Appendices](#appendices)
   - [Appendix A: List of baseline covariates](#sec-appA)
 - [Tables](#tables)
   - [Table 1](#table-1)
+  - [Table 2](#table-2)
 - [Key variables](#key-variables)
   - [Valid targetable mutation test or PDL1
     test](#valid-targetable-mutation-test-or-pdl1-test)
@@ -218,14 +224,103 @@ generality. :
 
 - $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is week
   when death/censoring occurs.
-- Define earliest valid test result date as the date when any one of 1)
-  PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
-  mutations was made available to the clinician.
+- Define earliest valid test result date as the date when any one of
+  1)  PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
+      mutations was made available to the clinician.
 - $C_k = min \{\text{end of week $k$, earliest valid test result date} \}$
 - $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
 
 In a plane language, we have two cohorts for each time interval $k$. One
 cohort is the patient who has $A_k=0$, where 1L was
+
+  
+
+# Outcome
+
+Death.
+
+If date of death is missing, the patient was presumed alive and was
+censored at the most recent record of valid vitals or oral medication
+dates as advised<sup>4</sup>.
+
+Date of death is provided only up to month, for de-identification
+purposes. As we required up to days for survival analysis, we imputed
+date of death at the 15th of the month of death as recommended by
+Flatiron Health. This approach best approximates the results generated
+from using the exact date of death in comparative analysis pre and post
+de-dentification<sup>5</sup>.
+
+  
+
+# Covariates
+
+## Baseline (45 variables)
+
+List of baseline covariates and their definitions are listed in
+@ref{sec-appA}. Note that most recent measurement prior to index date
+will be used.
+
+1.  Socio-demographics (5): gender, age, Race/Ethnicity, Smoking status,
+    histology
+2.  ECOG (1): Eastern Cooperative Oncology Group score
+3.  Vitals/Labs (39): body mass index (BMI), Continuous and categorical
+    version of complete metabolic panel (CMP) and complete blood panel
+    (CBP) collected by Flatiron. Except carbon dioxide and glucose from
+    complete metabolic panel has been excluded due to volatility over
+    every seconds.
+
+- CMP ($12 * 2$): Albumin, Alkaline, Alanine aminotransferase (ALT),
+  Aspartate aminotransferase (AST), Bilirubin, Calcium, Chloride,
+  Creatinine, Potassium, Protein, Sodium, eGFR
+- CBP ($7 * 2$) : Hematocrit (HCT), Hemoglobin (HGB), Lymphocyte count,
+  Neutrophil count, Platelet, Erythrocytes (RBC), Leukocytes (WBC)
+
+  
+
+## Time-varying (40 variables)
+
+ECOG PS (ECOG) reflect the patient’s overall health. The higher the
+score, the severe the health of the patient. Clinicians use ECOG to
+decide whether they should wait until valid test can be obtains prior to
+administering 1L or not. Therefore, ECOG is both a risk factor for
+mortality and also predicts subsequent exposure. Morevoer, waiting/not
+waiting for valid test results prior to 1L initiation can also affect
+the ECOG score. We decided to use all vitals/labs and ECOG scores to be
+time-varying. Since this is the first study of its kind, we decided to
+do a variable selection to identify such confounder. ECOG and albumin
+are the two time-varying covariates that are chosen by the oncologist
+that he uses himself to make the decision. All other values will be
+explored for their role as time-varying confounders using variable
+selection method.
+
+All time-varying covariates are updated for each time interval (weekly).
+If there are more than one observation in the interval, then the first
+one observed will be chosen. If no observations are made in the
+interval, the last observed value will be carried forward indefinitely
+until a new measurement is available or until the patient dies or is
+censored. These covariates will be used to generate inverse probability
+of weighting.
+
+  
+
+# Statistical analysis
+
+1.  To account for missingness of baseline covariates (quantified in
+    Table 1), for the ones we think are missing at random (MAR), perform
+    multiple imputation with chained equations in 10 imputed
+    datasets<sup>6</sup>.
+    1.  Weights (below) will be re-computed separately within each
+        imputed data set.
+    2.  Effect size and standard error estimates will be computed using
+        Rubin’s formula across the imputed data sets.
+    3.  Due to computation burden, we will nest the bootstrapping
+        procedure for calculating confidence intervals within each
+        imputed dataset, instead of the other way around.
+2.  For the covariates that are missing not at random (MNAR), create a
+    categorical variable that includes missing as one level.
+3.  Generate propensity score of initiating 1L therapy before observing
+    valid test results using a logistic regression model as a function
+    of all baseline covariates (Table 2)
 
   
 
@@ -344,6 +439,662 @@ cohort is the patient who has $A_k=0$, where 1L was
 | Categorical CBP                |              |           |                  |
 
 Table1: Mock table demonstrating format of reporting proportion missing.
+
+## Table 2
+
+<div id="mnzbnvaxrz" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#mnzbnvaxrz table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+&#10;#mnzbnvaxrz thead, #mnzbnvaxrz tbody, #mnzbnvaxrz tfoot, #mnzbnvaxrz tr, #mnzbnvaxrz td, #mnzbnvaxrz th {
+  border-style: none;
+}
+&#10;#mnzbnvaxrz p {
+  margin: 0;
+  padding: 0;
+}
+&#10;#mnzbnvaxrz .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+&#10;#mnzbnvaxrz .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+&#10;#mnzbnvaxrz .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+&#10;#mnzbnvaxrz .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+&#10;#mnzbnvaxrz .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+&#10;#mnzbnvaxrz .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+&#10;#mnzbnvaxrz .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+&#10;#mnzbnvaxrz .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+&#10;#mnzbnvaxrz .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+&#10;#mnzbnvaxrz .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+&#10;#mnzbnvaxrz .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+&#10;#mnzbnvaxrz .gt_from_md > :first-child {
+  margin-top: 0;
+}
+&#10;#mnzbnvaxrz .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+&#10;#mnzbnvaxrz .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+&#10;#mnzbnvaxrz .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+&#10;#mnzbnvaxrz .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+&#10;#mnzbnvaxrz .gt_row_group_first td {
+  border-top-width: 2px;
+}
+&#10;#mnzbnvaxrz .gt_row_group_first th {
+  border-top-width: 2px;
+}
+&#10;#mnzbnvaxrz .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+&#10;#mnzbnvaxrz .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+&#10;#mnzbnvaxrz .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+&#10;#mnzbnvaxrz .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+&#10;#mnzbnvaxrz .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+&#10;#mnzbnvaxrz .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+&#10;#mnzbnvaxrz .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+&#10;#mnzbnvaxrz .gt_left {
+  text-align: left;
+}
+&#10;#mnzbnvaxrz .gt_center {
+  text-align: center;
+}
+&#10;#mnzbnvaxrz .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+&#10;#mnzbnvaxrz .gt_font_normal {
+  font-weight: normal;
+}
+&#10;#mnzbnvaxrz .gt_font_bold {
+  font-weight: bold;
+}
+&#10;#mnzbnvaxrz .gt_font_italic {
+  font-style: italic;
+}
+&#10;#mnzbnvaxrz .gt_super {
+  font-size: 65%;
+}
+&#10;#mnzbnvaxrz .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+&#10;#mnzbnvaxrz .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+&#10;#mnzbnvaxrz .gt_indent_1 {
+  text-indent: 5px;
+}
+&#10;#mnzbnvaxrz .gt_indent_2 {
+  text-indent: 10px;
+}
+&#10;#mnzbnvaxrz .gt_indent_3 {
+  text-indent: 15px;
+}
+&#10;#mnzbnvaxrz .gt_indent_4 {
+  text-indent: 20px;
+}
+&#10;#mnzbnvaxrz .gt_indent_5 {
+  text-indent: 25px;
+}
+&#10;#mnzbnvaxrz .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+&#10;#mnzbnvaxrz div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <caption>Table 2: Baseline characteristics of aNSCLC patients included in the current analysis before and after IP weighting</caption>
+  <thead>
+    <tr class="gt_col_headings gt_spanner_row">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="2" colspan="1" scope="col" id="a::stub"></th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="3" scope="colgroup" id="**Before IPW**">
+        <div class="gt_column_spanner"><span class='gt_from_md'><strong>Before IPW</strong></span></div>
+      </th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="3" scope="colgroup" id="**After IPW**">
+        <div class="gt_column_spanner"><span class='gt_from_md'><strong>After IPW</strong></span></div>
+      </th>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" style="font-weight: bold;" scope="col" id="Wait-(n=)-before">Wait (n=)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" style="font-weight: bold;" scope="col" id="Do-not-wait-(n=)-before">Do not wait (n=)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" style="font-weight: bold;" scope="col" id="ASMD-before">ASMD</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" style="font-weight: bold;" scope="col" id="Wait-(n=)-after">Wait (n=)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" style="font-weight: bold;" scope="col" id="Do-not-wait-(n=)-after">Do not wait (n=)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" style="font-weight: bold;" scope="col" id="ASMD-after">ASMD</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><th id="stub_1_1" scope="row" class="gt_row gt_left gt_stub">Gender</th>
+<td headers="stub_1_1 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_1 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_1 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_1 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_1 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_1 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_2" scope="row" class="gt_row gt_left gt_stub">Age</th>
+<td headers="stub_1_2 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_2 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_2 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_2 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_2 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_2 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_3" scope="row" class="gt_row gt_left gt_stub">Race/Ethnicity</th>
+<td headers="stub_1_3 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_3 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_3 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_3 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_3 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_3 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_4" scope="row" class="gt_row gt_left gt_stub">Smoking Status</th>
+<td headers="stub_1_4 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_4 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_4 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_4 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_4 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_4 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_5" scope="row" class="gt_row gt_left gt_stub">Histology</th>
+<td headers="stub_1_5 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_5 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_5 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_5 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_5 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_5 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_6" scope="row" class="gt_row gt_left gt_stub">BMI</th>
+<td headers="stub_1_6 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_6 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_6 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_6 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_6 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_6 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_7" scope="row" class="gt_row gt_left gt_stub">ECOG score</th>
+<td headers="stub_1_7 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_7 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_7 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_7 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_7 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_7 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_8" scope="row" class="gt_row gt_left gt_stub">Complete metabolic panel (CMP)</th>
+<td headers="stub_1_8 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_8 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_8 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_8 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_8 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_8 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_9" scope="row" class="gt_row gt_left gt_stub">Albumin</th>
+<td headers="stub_1_9 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_9 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_9 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_9 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_9 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_9 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_10" scope="row" class="gt_row gt_left gt_stub">Alkaline</th>
+<td headers="stub_1_10 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_10 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_10 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_10 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_10 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_10 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_11" scope="row" class="gt_row gt_left gt_stub">ALT</th>
+<td headers="stub_1_11 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_11 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_11 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_11 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_11 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_11 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_12" scope="row" class="gt_row gt_left gt_stub">AST</th>
+<td headers="stub_1_12 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_12 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_12 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_12 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_12 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_12 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_13" scope="row" class="gt_row gt_left gt_stub">Bilirubin</th>
+<td headers="stub_1_13 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_13 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_13 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_13 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_13 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_13 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_14" scope="row" class="gt_row gt_left gt_stub">Calcium</th>
+<td headers="stub_1_14 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_14 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_14 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_14 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_14 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_14 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_15" scope="row" class="gt_row gt_left gt_stub">Carbon dioxide</th>
+<td headers="stub_1_15 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_15 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_15 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_15 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_15 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_15 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_16" scope="row" class="gt_row gt_left gt_stub">Chloride</th>
+<td headers="stub_1_16 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_16 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_16 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_16 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_16 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_16 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_17" scope="row" class="gt_row gt_left gt_stub">Creatinine</th>
+<td headers="stub_1_17 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_17 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_17 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_17 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_17 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_17 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_18" scope="row" class="gt_row gt_left gt_stub">Glucose</th>
+<td headers="stub_1_18 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_18 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_18 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_18 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_18 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_18 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_19" scope="row" class="gt_row gt_left gt_stub">Potassium</th>
+<td headers="stub_1_19 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_19 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_19 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_19 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_19 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_19 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_20" scope="row" class="gt_row gt_left gt_stub">Protein</th>
+<td headers="stub_1_20 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_20 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_20 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_20 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_20 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_20 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_21" scope="row" class="gt_row gt_left gt_stub">Sodium</th>
+<td headers="stub_1_21 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_21 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_21 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_21 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_21 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_21 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_22" scope="row" class="gt_row gt_left gt_stub">eGFR_mdrd</th>
+<td headers="stub_1_22 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_22 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_22 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_22 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_22 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_22 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_23" scope="row" class="gt_row gt_left gt_stub">eGFR_ckd_epi</th>
+<td headers="stub_1_23 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_23 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_23 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_23 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_23 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_23 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_24" scope="row" class="gt_row gt_left gt_stub">Categorical CMP</th>
+<td headers="stub_1_24 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_24 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_24 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_24 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_24 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_24 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_25" scope="row" class="gt_row gt_left gt_stub">Complete Blood Panel (CBP)</th>
+<td headers="stub_1_25 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_25 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_25 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_25 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_25 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_25 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_26" scope="row" class="gt_row gt_left gt_stub">HCT</th>
+<td headers="stub_1_26 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_26 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_26 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_26 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_26 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_26 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_27" scope="row" class="gt_row gt_left gt_stub">HGB</th>
+<td headers="stub_1_27 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_27 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_27 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_27 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_27 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_27 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_28" scope="row" class="gt_row gt_left gt_stub">Lymphocyte #</th>
+<td headers="stub_1_28 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_28 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_28 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_28 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_28 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_28 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_29" scope="row" class="gt_row gt_left gt_stub">Neutrophil #</th>
+<td headers="stub_1_29 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_29 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_29 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_29 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_29 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_29 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_30" scope="row" class="gt_row gt_left gt_stub">Platelet</th>
+<td headers="stub_1_30 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_30 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_30 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_30 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_30 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_30 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_31" scope="row" class="gt_row gt_left gt_stub">RBC</th>
+<td headers="stub_1_31 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_31 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_31 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_31 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_31 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_31 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_32" scope="row" class="gt_row gt_left gt_stub">WBC</th>
+<td headers="stub_1_32 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_32 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_32 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_32 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_32 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_32 ASMD after" class="gt_row gt_right"></td></tr>
+    <tr><th id="stub_1_33" scope="row" class="gt_row gt_left gt_stub">Categorical CBP</th>
+<td headers="stub_1_33 Wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_33 Do not wait (n=) before" class="gt_row gt_right"></td>
+<td headers="stub_1_33 ASMD before" class="gt_row gt_right" style="border-right-width: 1px; border-right-style: solid; border-right-color: #000000;"></td>
+<td headers="stub_1_33 Wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_33 Do not wait (n=) after" class="gt_row gt_right"></td>
+<td headers="stub_1_33 ASMD after" class="gt_row gt_right"></td></tr>
+  </tbody>
+  &#10;  
+</table>
+</div>
 
 # Key variables
 
@@ -509,6 +1260,35 @@ arXiv:2001.09765* (2020).</span>
 </span><span class="csl-right-inline">Zhang, S. BirthYear overview and
 data considerations.
 <https://flatironlifesciences.zendesk.com/hc/en-us/articles/11186051513229-BirthYear-Overview-and-Data-Considerations>.</span>
+
+</div>
+
+<div id="ref-RN408" class="csl-entry">
+
+<span class="csl-left-margin">4.
+</span><span class="csl-right-inline">Long, L. [\[Methods
+considerations\] censoring strategies in real-world overall survival
+(rwOS)](https://flatironlifesciences.zendesk.com/hc/en-us/articles/360058946451--Methods-Considerations-Censoring-Strategies-in-Real-World-Overall-Survival-rwOS).
+vol. 2025.</span>
+
+</div>
+
+<div id="ref-RN261" class="csl-entry">
+
+<span class="csl-left-margin">5.
+</span><span class="csl-right-inline">Health, F. [Enhanced mortality
+V2.0/V2.1 overview and data
+considerations](https://flatironlifesciences.zendesk.com/hc/en-us/articles/360041924812-Enhanced-Mortality-V2-0-V2-1-Overview-and-Data-Considerations).
+vol. 2024 (2024).</span>
+
+</div>
+
+<div id="ref-white2011multiple" class="csl-entry">
+
+<span class="csl-left-margin">6.
+</span><span class="csl-right-inline">White, I. R., Royston, P. & Wood,
+A. M. Multiple imputation using chained equations: Issues and guidance
+for practice. *Statistics in medicine* **30**, 377–399 (2011).</span>
 
 </div>
 

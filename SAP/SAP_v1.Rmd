@@ -12,6 +12,8 @@ bibliography: references.bib
 csl: nature.csl
 editor_options: 
   chunk_output_type: console
+  markdown: 
+    wrap: 72
 ---
 
 ```{r include=FALSE}
@@ -52,24 +54,67 @@ ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the envi
 
 # Hypothesis
 
-Advanced non-small cell lung cancer (aNSCLC) patients' recommended course of treatments are identified in National Comprehensive Cancer Network (NCCN) guideline. The guideline suggests each patient to perform biopsy to identify presence of targetable mutations of certain biomarkers and PDL1 expression to make a informed decision on 1L therapy choice. This recommendation is made because targeted therapy is better for patient's survival than a standard, genetic therapy such as chemotherapy or immunotherapy. Usually, at least 1 positive mutation or 2 negative mutation status among all targetable biomarkers should be obtained to make informed decision about targetable therapy. Thus having at least 1 positive mutation or 2 negative mutation status will be referred to as *useful* mutation test result from here onward. Similarly, obtaining PDL1 expression level (from 0-100%) level, as opposed to result such as missing expression level or indeterminate result, will be referred to as *useful* PDL1 test result.
+Advanced non-small cell lung cancer (aNSCLC) patients' recommended
+course of treatments are identified in National Comprehensive Cancer
+Network (NCCN) guideline. The guideline suggests each patient to perform
+biopsy to identify presence of targetable mutations of certain
+biomarkers and PDL1 expression to make a informed decision on 1L therapy
+choice. This recommendation is made because targeted therapy is better
+for patient's survival than a standard, genetic therapy such as
+chemotherapy or immunotherapy. Usually, at least 1 positive mutation or
+2 negative mutation status among all targetable biomarkers should be
+obtained to make informed decision about targetable therapy. Thus having
+at least 1 positive mutation or 2 negative mutation status will be
+referred to as *useful* mutation test result from here onward.
+Similarly, obtaining PDL1 expression level (from 0-100%) level, as
+opposed to result such as missing expression level or indeterminate
+result, will be referred to as *useful* PDL1 test result.
 
-The standard NCCN guideline, however, may not always be followed due to reasons such as clinician's expert knowledge and ethics. For example, heavy smokers who develop lung cancer is most likely due to smoking rather than genetic mutation. Patients who fall into this category then may receive chemotherapy right away, instead of performing and waiting for genetic or PDL1 test results. One reason for not waiting until the useful test comes out is that a complete panel of test results (combined mutation and PDL1 expression tests) usually takes about 2-3 weeks to become available. It may take longer if the biopsy samples were not good and the test results are indeterminate, requiring another round of biopsy and waiting for the result. This period of waiting without doing any treatment may be detrimental to patient's health and thus becomes an ethical issue. Therefore, the ultimate choice of whether waiting for the test result or not relies heavily on the clinician's decision.
+The standard NCCN guideline, however, may not always be followed due to
+reasons such as clinician's expert knowledge and ethics. For example,
+heavy smokers who develop lung cancer is most likely due to smoking
+rather than genetic mutation. Patients who fall into this category then
+may receive chemotherapy right away, instead of performing and waiting
+for genetic or PDL1 test results. One reason for not waiting until the
+useful test comes out is that a complete panel of test results (combined
+mutation and PDL1 expression tests) usually takes about 2-3 weeks to
+become available. It may take longer if the biopsy samples were not good
+and the test results are indeterminate, requiring another round of
+biopsy and waiting for the result. This period of waiting without doing
+any treatment may be detrimental to patient's health and thus becomes an
+ethical issue. Therefore, the ultimate choice of whether waiting for the
+test result or not relies heavily on the clinician's decision.
 
-Just like the example of heavy smokers, there are some patient characteristics that are highly indicative of patient's likelihood of targetable mutation status. However, there has not yet been a quantitative evaluation of effect of proceeding to 1L therapy prior to knowing targetable mutation status in patients. In this study, we evaluate causal effect of proceeding right 1L therapy in all aNSCLC patients, as well as in some subgroups that have previously been identified as associated with the mutation status.
+Just like the example of heavy smokers, there are some patient
+characteristics that are highly indicative of patient's likelihood of
+targetable mutation status. However, there has not yet been a
+quantitative evaluation of effect of proceeding to 1L therapy prior to
+knowing targetable mutation status in patients. In this study, we
+evaluate causal effect of proceeding right 1L therapy in all aNSCLC
+patients, as well as in some subgroups that have previously been
+identified as associated with the mutation status.
 
 \
 
 # Objectives
 
-**Primary Objective**: Using marginal structural model, we will develop and evaluate the effect of proceeding to 1L therapy prior to obtaining useful targetable mutation status
+**Primary Objective**: Using marginal structural model, we will develop
+and evaluate the effect of proceeding to 1L therapy prior to obtaining
+useful targetable mutation status
 
 -   Limit the number of weeks.
 -   For entire observation.
 
-**Secondary Objective**: Test impact of proceeding to 1L before useful tests become available in the following subgroups: male, female, have history of smoking, do not have history of smoking, baseline Eastern Cooperative Oncology Group (ECOG) score 0-2, baseline ECOG score 3-4, baseline albumin \< 35g/L, baseline albumin \>= 35 g/L, and Asian. 
+**Secondary Objective**: Test impact of proceeding to 1L before useful
+tests become available in the following subgroups: male, female, have
+history of smoking, do not have history of smoking, baseline Eastern
+Cooperative Oncology Group (ECOG) score 0-2, baseline ECOG score 3-4,
+baseline albumin \< 35g/L, baseline albumin \>= 35 g/L, and Asian.
 
-- These are the subgroups identified by Wally as having either higher or lower probability of having targetable mutation, and thus would more or less likely wait for the useful test results to become available prior to initiating 1L therapy. 
+-   These are the subgroups identified by Wally as having either higher
+    or lower probability of having targetable mutation, and thus would
+    more or less likely wait for the useful test results to become
+    available prior to initiating 1L therapy.
 
 \
 
@@ -79,28 +124,37 @@ Just like the example of heavy smokers, there are some patient characteristics t
 
 Retrospective Cohort Study
 
-
 ## Study Population
 
+**Data**: A nationwide Flatiron Health electronic health record
+(EHR)-derived de-identified database. The Flatiron Health database is a
+longitudinal database, comprising de-identified patient-level structured
+and unstructured data, curated via technology-enabled abstraction
+[@ma2020comparison; @birnbaum2020model]. The de-identified data
+originated from 280 cancer clinics (\~800 sites of care). Patients with
+a BirthYear of 1937 or earlier may have an adjusted BirthYear in
+Flatiron datasets due to patient de-identification requirements. For
+more information, please refer to their webpage [@zhang2025].
 
-**Data**: A nationwide Flatiron Health electronic health record (EHR)-derived de-identified database. The Flatiron Health database is a longitudinal database, comprising de-identified patient-level structured and unstructured data, curated via technology-enabled abstraction [@ma2020comparison; @birnbaum2020model]. The de-identified data originated from 280 cancer clinics (\~800 sites of care). Patients with a BirthYear of 1937 or earlier may have an adjusted BirthYear in Flatiron datasets due to patient de-identification requirements. For more information, please refer to their webpage [@zhang2025].
+**Inclusion criteria**: People who got diagnosed with aNSLC (ICD-9 162.x
+or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from
+Flatiron Health network.
 
+1.  Index date is date of aNSCLC diagnosis.
 
-**Inclusion criteria**: People who got diagnosed with aNSLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from Flatiron Health network. 
+**Exclusion criteria**:
 
-1. Index date is date of aNSCLC diagnosis.
+1.  Initiate who receive first-line (1L) therapy on or after the index
+    date.
+2.  Receive any useful test result (either PDL1 or targetable mutation)
+    prior to the index date
+3.  Missing death or censoring date
 
-
-
-**Exclusion criteria**: 
-
-1. Initiate who receive first-line (1L) therapy on or after the index date. 
-2. Receive any useful test result (either PDL1 or targetable mutation) prior to the index date
-3. Missing death or censoring date
-
-
-
-Patient attrition diagram is shown below. It shows all exclusion criteria. We excluded all patients who don't have valid survival end time and who start either the 1L therapy or valid test before advanced diagnosis date. We will explain what valid test means in the next section.
+Patient attrition diagram is shown below. It shows all exclusion
+criteria. We excluded all patients who don't have valid survival end
+time and who start either the 1L therapy or valid test before advanced
+diagnosis date. We will explain what valid test means in the next
+section.
 
 ```{r pt_attrition, out.width='70%', fig.cap='Figure XX: Patient attrition diagram'}
 
@@ -109,22 +163,37 @@ knitr::include_graphics("./image/patient_attrition_diagram.jpg")
 
 ```
 
-
-
-
-
 # Data Strucutre
 
-There are 9 data sets of wide and long formats. Data sets containing repeated measurements such as visits, PDL1 or targetable mutation test, or lab values will be long format. The unit of observation differs by the dataset. 
+There are 9 data sets of wide and long formats. Data sets containing
+repeated measurements such as visits, PDL1 or targetable mutation test,
+or lab values will be long format. The unit of observation differs by
+the dataset.
 
+1.  Create a single date variable where useful PDL1 test results are
+    observed in each patient.
+2.  Create a single date variable where useful targetable mutation test
+    results are observed in each patient.
+3.  For each consecutive week after the index date, create a binary
+    indicator variable indicating who initiated 1L therapy before
+    receiving any useful test is out. (Cohort identification)
+4.  Create baseline covariates as listed in \@ref(sec-appA)
 
-1. Create a single date variable where useful PDL1 test results are observed in each patient. 
-2. Create a single date variable where useful targetable mutation test results are observed in each patient. 
-3. For each consecutive week after the index date, create a binary indicator variable indicating who initiated 1L therapy before receiving any useful test is out. (Cohort identification)
-4. Create baseline covariates as listed in \@ref(sec-appA)
-  a. report the percent missing of each variable overall by exposure group as in \@ref(tab:baseline-missing-mock)
-5. For each consecutive week after the index date, a long dataset is created for each patient's weekly time-varying follow-up variables listed in Appendix B. There will be a variable named $k$ which shows number of weeks since index date. When $k=0$, it refers to baseline. Suppose for an example, albumin measurement at $k=1$ represent measurements taken between $(0,7]$ days, and at $k=2$ will represent measurements taken between $(7,14]$ days.  
-6. Impute censoring date using visit and oral medication record
+<!-- -->
+
+a.  report the percent missing of each variable overall by exposure
+    group as in \@ref(tab:baseline-missing-mock)
+
+<!-- -->
+
+5.  For each consecutive week after the index date, a long dataset is
+    created for each patient's weekly time-varying follow-up variables
+    listed in Appendix B. There will be a variable named $k$ which shows
+    number of weeks since index date. When $k=0$, it refers to baseline.
+    Suppose for an example, albumin measurement at $k=1$ represent
+    measurements taken between $(0,7]$ days, and at $k=2$ will represent
+    measurements taken between $(7,14]$ days.\
+6.  Impute censoring date using visit and oral medication record
 
 \
 
@@ -171,14 +240,11 @@ knitr::kable(replicated_df,
 
 ```
 
-
 \
 
 # Cohort
 
-
 ## Directed acyclic graph (DAG)
-
 
 ```{r fig-DAG, out.width='70%',  fig.cap="Figure XX: Directed acyclic graph. Y refers to survival outcome, A's refer to time-dependent cohort status, L's refer to time-dependent measured confounders, and U's refer to time-dependent unmeasured confounders. Index 0 is the baseline measruement. Thus, L0 contains variable such as gender and race/ethnicity. L1 then has a subset of variables of L0, where only time-varying variables are contained. The time index (k) goes from 1 through K_i, where i refers to a patient. Each patient has different number of weeks of follow-up until censored or dead."}
 
@@ -186,24 +252,112 @@ knitr::include_graphics("./image/DAG.jpg")
 
 ```
 
-
 \@ref{fig-DAG}
 
+We define time-varying cohort variable at each $k$ for a patient as
+follows. For simplicity, we will drop $i$ in $K_i$ without loss of
+generality. :
 
-We define time-varying cohort variable at each $k$ for a patient as follows. For simplicity, we will drop $i$ in $K_i$ without loss of generality. : 
+-   $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is
+    week when death/censoring occurs.
+-   Define earliest valid test result date as the date when any one of
+    1) PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
+    mutations was made available to the clinician.
+-   $C_k = min \{\text{end of week $k$, earliest valid test result date} \}$
+-   $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
 
-- $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is week when death/censoring occurs.
-- Define earliest valid test result date as the date when any one of 1) PDL1 expression level, 2)1 positive mutation, or 3) 2 negative mutations was made available to the clinician.
-- $C_k = min \{\text{end of week $k$, earliest valid test result date} \}$ 
-- $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
-
-
-In a plane language, we have two cohorts for each time interval $k$. One cohort is the patient who has $A_k=0$, where 1L was 
-
+In a plane language, we have two cohorts for each time interval $k$. One
+cohort is the patient who has $A_k=0$, where 1L was
 
 \
 
+# Outcome
 
+Death.
+
+If date of death is missing, the patient was presumed alive and was
+censored at the most recent record of valid vitals or oral medication
+dates as advised [@RN408].
+
+Date of death is provided only up to month, for de-identification
+purposes. As we required up to days for survival analysis, we imputed
+date of death at the 15th of the month of death as recommended by
+Flatiron Health. This approach best approximates the results generated
+from using the exact date of death in comparative analysis pre and post
+de-dentification[@RN261].
+
+\
+
+# Covariates
+
+## Baseline (45 variables)
+
+List of baseline covariates and their definitions are listed in
+\@ref{sec-appA}. Note that most recent measurement prior to index date
+will be used.
+
+1.  Socio-demographics (5): gender, age, Race/Ethnicity, Smoking status,
+    histology
+2.  ECOG (1): Eastern Cooperative Oncology Group score
+3.  Vitals/Labs (39): body mass index (BMI), Continuous and categorical
+    version of complete metabolic panel (CMP) and complete blood panel
+    (CBP) collected by Flatiron. Except carbon dioxide and glucose from
+    complete metabolic panel has been excluded due to volatility over
+    every seconds.
+
+-   CMP ($12 * 2$): Albumin, Alkaline, Alanine aminotransferase (ALT),
+    Aspartate aminotransferase (AST), Bilirubin, Calcium, Chloride,
+    Creatinine, Potassium, Protein, Sodium, eGFR
+-   CBP ($7 * 2$) : Hematocrit (HCT), Hemoglobin (HGB), Lymphocyte
+    count, Neutrophil count, Platelet, Erythrocytes (RBC), Leukocytes
+    (WBC)
+
+\
+
+## Time-varying (40 variables)
+
+ECOG PS (ECOG) reflect the patient's overall health. The higher the
+score, the severe the health of the patient. Clinicians use ECOG to
+decide whether they should wait until valid test can be obtains prior to
+administering 1L or not. Therefore, ECOG is both a risk factor for
+mortality and also predicts subsequent exposure. Morevoer, waiting/not
+waiting for valid test results prior to 1L initiation can also affect
+the ECOG score. We decided to use all vitals/labs and ECOG scores to be
+time-varying. Since this is the first study of its kind, we decided to
+do a variable selection to identify such confounder. ECOG and albumin
+are the two time-varying covariates that are chosen by the oncologist
+that he uses himself to make the decision. All other values will be
+explored for their role as time-varying confounders using variable
+selection method.
+
+All time-varying covariates are updated for each time interval (weekly).
+If there are more than one observation in the interval, then the first
+one observed will be chosen. If no observations are made in the
+interval, the last observed value will be carried forward indefinitely
+until a new measurement is available or until the patient dies or is
+censored. These covariates will be used to generate inverse probability
+of weighting.
+
+\
+
+# Statistical analysis
+
+1.  To account for missingness of baseline covariates (quantified in
+    Table 1), for the ones we think are missing at random (MAR), perform
+    multiple imputation with chained equations in 10 imputed
+    datasets[@white2011multiple].
+    i.  Weights (below) will be re-computed separately within each
+        imputed data set.
+    ii. Effect size and standard error estimates will be computed using
+        Rubin’s formula across the imputed data sets.
+    iii. Due to computation burden, we will nest the bootstrapping
+         procedure for calculating confidence intervals within each
+         imputed dataset, instead of the other way around.
+2.  For the covariates that are missing not at random (MNAR), create a
+    categorical variable that includes missing as one level.
+3. Generate propensity score of initiating 1L therapy before observing valid test results using a logistic regression model as a function of all baseline covariates (Table 2)
+
+\
 
 # Appendices {.appendix}
 
@@ -309,38 +463,37 @@ kable(baseline_cov2)
 
 ```
 
-
-
-
-- Gender: Demographics.csv/Gender
-- Age at diagnosis:
-  - Demographics.csv/BirthYear
-  - Enhanced_AdvancedNSCLC.csv/AdvancedDiagnosisDate 
-  - difference in the two above dates
-- Race/Ethnicity:
-  - Demographics.csv/Race
-  - Demographics.csv/Ethnicity
-  - Append the two variables
-- Smoking status: Enhanced_AdvancedNSCLC.csv/SmokingStatus
-- Histology: Enhanced_AdvancedNSCLC.csv/Histology
-- BMI: 
-  - Vitals.csv/Test  : choose the entries equal to "body weight" and "body height". Body weight is in kg, and the body height is in cm. generate BMI (kg/m^2) from these two entries.
-- ECOG score: ECOG.csv/EcogValue
-- Complete metabolic panel(CMP) (Albumin, Alkaline, ALT, Bilirubin, Calcium, Carbon dioxide, Chloride, Creatinine, eGFR, Potassium, Protein, Sodium, HCT, HGB, Lymphocyte #, Neutrophil #) : 
-  - Lab.csv/TestResultCleaned
-  - Lab.csv/TestBaseName : filter to the CMP
-- Categorical CMP: Take CMP, and discretize into Above, Average, Below using website (https://www.ucsfhealth.org/medical-tests/comprehensive-metabolic-panel)
-  - https://www.ncbi.nlm.nih.gov/books/NBK204/#:~:text=The%20normal%20serum%20protein%20level,according%20to%20the%20individual%20laboratory.
-- Complete blood count(CBC) (Platelet, RBC, WBC) : 
-  - Lab.csv/TestResultCleaned
-  - Lab.csv/TestBaseName : filter to the CBC
-- Categorical CBC: Take CBC, and discretize into Above, Average, Below using website  
-  - https://www.ncbi.nlm.nih.gov/books/NBK2263/table/ch1.T1/
-
-
-
-
-
+-   Gender: Demographics.csv/Gender
+-   Age at diagnosis:
+    -   Demographics.csv/BirthYear
+    -   Enhanced_AdvancedNSCLC.csv/AdvancedDiagnosisDate
+    -   difference in the two above dates
+-   Race/Ethnicity:
+    -   Demographics.csv/Race
+    -   Demographics.csv/Ethnicity
+    -   Append the two variables
+-   Smoking status: Enhanced_AdvancedNSCLC.csv/SmokingStatus
+-   Histology: Enhanced_AdvancedNSCLC.csv/Histology
+-   BMI:
+    -   Vitals.csv/Test : choose the entries equal to "body weight" and
+        "body height". Body weight is in kg, and the body height is
+        in cm. generate BMI (kg/m\^2) from these two entries.
+-   ECOG score: ECOG.csv/EcogValue
+-   Complete metabolic panel(CMP) (Albumin, Alkaline, ALT, Bilirubin,
+    Calcium, Carbon dioxide, Chloride, Creatinine, eGFR, Potassium,
+    Protein, Sodium, HCT, HGB, Lymphocyte #, Neutrophil \#) :
+    -   Lab.csv/TestResultCleaned
+    -   Lab.csv/TestBaseName : filter to the CMP
+-   Categorical CMP: Take CMP, and discretize into Above, Average, Below
+    using website
+    (<https://www.ucsfhealth.org/medical-tests/comprehensive-metabolic-panel>)
+    -   <https://www.ncbi.nlm.nih.gov/books/NBK204/#>:\~:text=The%20normal%20serum%20protein%20level,according%20to%20the%20individual%20laboratory.
+-   Complete blood count(CBC) (Platelet, RBC, WBC) :
+    -   Lab.csv/TestResultCleaned
+    -   Lab.csv/TestBaseName : filter to the CBC
+-   Categorical CBC: Take CBC, and discretize into Above, Average, Below
+    using website
+    -   <https://www.ncbi.nlm.nih.gov/books/NBK2263/table/ch1.T1/>
 
 \
 
@@ -370,80 +523,167 @@ kable(tab1_missing_mock, caption = "Table1: Mock table demonstrating format of r
 
 ```
 
+
+
+## Table 2
+
+```{r}
+#| echo: false
+#| eval: true
+#| label: tbl-baseline-dist
+
+
+# #| tbl-colwidths: []
+
+
+data.table(
+  variable=baseline_cov$variable,
+  `Wait (n=) before`="",
+  `Do not wait (n=) before`="",
+  `ASMD before`="",
+  
+  `Wait (n=) after`="",
+  `Do not wait (n=) after`="",
+  `ASMD after`=""
+) |>  
+  gt(rowname_col = "variable") |>
+  tab_spanner(
+    label = md("**Before IPW**"),
+    columns = c(
+      `Wait (n=) before`,`Do not wait (n=) before`,`ASMD before`
+    )
+  ) |> 
+  tab_spanner(
+    label = md("**After IPW**"),
+    columns = c(
+      `Wait (n=) after`,`Do not wait (n=) after`,`ASMD after`
+    )
+  ) |> 
+  cols_label(
+    `Wait (n=) before`="Wait (n=)",
+    `Do not wait (n=) before`="Do not wait (n=)",
+    `ASMD before`="ASMD",
+    
+    `Wait (n=) after`="Wait (n=)",
+    `Do not wait (n=) after`="Do not wait (n=)",
+    `ASMD after`="ASMD"
+  ) |> 
+  #Bold all column names
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) |> 
+  #Add vertical after `ASMD before` column
+  tab_style(
+    style = cell_borders(
+      sides = c( "right"),
+      weight = px(1)),
+    locations = cells_body(
+      columns = c(`ASMD before`)
+      )
+    ) |> 
+  tab_caption(
+    "Table 2: Baseline characteristics of aNSCLC patients included in the current analysis before and after IP weighting"
+  )
+
+
+
+```
 # Key variables
 
-- time zero: Enhanced_AdvancedNSCLC.csv/AdvancedDiagnosisDate 
-- death date: Enhanced_Mortality_V2.csv/DateOfDeath
-- censoring date:
-  -   Visit.csv/VisitDate
-  -   Enhanced_AdvNSCLC_Orals.csv/EndDate
-  -   maximum of the two columns
-- 1L therapy date: 
-  - LineOfTherapy.csv/StartDate
-  - LineOfTherapy.csv/LineName  : must be equal to 1
-  - LineOfTherapy.csv/IsMaintenanceTherapy : must be FALSE
-- useful PDL1 test result:
-  - Enhanced_AdvNSCLCBiomarkers.csv/PercentStaining
-  - Enhanced_AdvNSCLCBiomarkers.csv/ResultDate  : must have result date
-  - Enhanced_AdvNSCLCBiomarkers.csv/PercentStaining  : should not be empty
-- useful mutation test result:
-  - Enhanced_AdvNSCLCBiomarkers.csv/BiomarkerStatus
-  - Enhanced_AdvNSCLCBiomarkers.csv/ResultDate  : must have result date
-  - Enhanced_AdvNSCLCBiomarkers.csv/BiomarkerStatus  : must have one of the following entries to be a positive mutation result:    "Mutation positive", "PD-L1 positive", "Rearrangement present", "Rearrangement positive", "Amplification positive", "Protein expression positive", "PD-L1 positive",
-  - Enhanced_AdvNSCLCBiomarkers.csv/BiomarkerStatus  : must have one of the following entries to be a negative mutation result:    "Mutation negative", "Negative", "PD-L1 negative/not detected", "Rearrangement not present"
-- Gender: Demographics.csv/Gender
-- Age at diagnosis:
-  - Demographics.csv/BirthYear
-  - Enhanced_AdvancedNSCLC.csv/AdvancedDiagnosisDate 
-  - difference in the two above dates
-- Race/Ethnicity:
-  - Demographics.csv/Race
-  - Demographics.csv/Ethnicity
-  - Append the two variables
-- Smoking status: Enhanced_AdvancedNSCLC.csv/SmokingStatus
-- Histology: Enhanced_AdvancedNSCLC.csv/Histology
-- BMI: 
-  - Vitals.csv/Test  : choose the entries equal to "body weight" and "body height". Body weight is in kg, and the body height is in cm. generate BMI (kg/m^2) from these two entries.
-- ECOG score: ECOG.csv/EcogValue
-- Complete metabolic panel(CMP) (Albumin, Alkaline, ALT, Bilirubin, Calcium, Carbon dioxide, Chloride, Creatinine, eGFR, Potassium, Protein, Sodium, HCT, HGB, Lymphocyte #, Neutrophil #) : 
-  - Lab.csv/TestResultCleaned
-  - Lab.csv/TestBaseName : filter to the CMP
-- Categorical CMP: Take CMP, and discretize into Above, Average, Below using website (https://www.ucsfhealth.org/medical-tests/comprehensive-metabolic-panel)
-  - https://www.ncbi.nlm.nih.gov/books/NBK204/#:~:text=The%20normal%20serum%20protein%20level,according%20to%20the%20individual%20laboratory.
-- Complete blood count(CBC) (Platelet, RBC, WBC) : 
-  - Lab.csv/TestResultCleaned
-  - Lab.csv/TestBaseName : filter to the CBC
-- Categorical CBC: Take CBC, and discretize into Above, Average, Below using website  
-  - https://www.ncbi.nlm.nih.gov/books/NBK2263/table/ch1.T1/
+-   time zero: Enhanced_AdvancedNSCLC.csv/AdvancedDiagnosisDate
+-   death date: Enhanced_Mortality_V2.csv/DateOfDeath
+-   censoring date:
+    -   Visit.csv/VisitDate
+    -   Enhanced_AdvNSCLC_Orals.csv/EndDate
+    -   maximum of the two columns
+-   1L therapy date:
+    -   LineOfTherapy.csv/StartDate
+    -   LineOfTherapy.csv/LineName : must be equal to 1
+    -   LineOfTherapy.csv/IsMaintenanceTherapy : must be FALSE
+-   useful PDL1 test result:
+    -   Enhanced_AdvNSCLCBiomarkers.csv/PercentStaining
+    -   Enhanced_AdvNSCLCBiomarkers.csv/ResultDate : must have result
+        date
+    -   Enhanced_AdvNSCLCBiomarkers.csv/PercentStaining : should not be
+        empty
+-   useful mutation test result:
+    -   Enhanced_AdvNSCLCBiomarkers.csv/BiomarkerStatus
+    -   Enhanced_AdvNSCLCBiomarkers.csv/ResultDate : must have result
+        date
+    -   Enhanced_AdvNSCLCBiomarkers.csv/BiomarkerStatus : must have one
+        of the following entries to be a positive mutation result:
+        "Mutation positive", "PD-L1 positive", "Rearrangement present",
+        "Rearrangement positive", "Amplification positive", "Protein
+        expression positive", "PD-L1 positive",
+    -   Enhanced_AdvNSCLCBiomarkers.csv/BiomarkerStatus : must have one
+        of the following entries to be a negative mutation result:
+        "Mutation negative", "Negative", "PD-L1 negative/not detected",
+        "Rearrangement not present"
+-   Gender: Demographics.csv/Gender
+-   Age at diagnosis:
+    -   Demographics.csv/BirthYear
+    -   Enhanced_AdvancedNSCLC.csv/AdvancedDiagnosisDate
+    -   difference in the two above dates
+-   Race/Ethnicity:
+    -   Demographics.csv/Race
+    -   Demographics.csv/Ethnicity
+    -   Append the two variables
+-   Smoking status: Enhanced_AdvancedNSCLC.csv/SmokingStatus
+-   Histology: Enhanced_AdvancedNSCLC.csv/Histology
+-   BMI:
+    -   Vitals.csv/Test : choose the entries equal to "body weight" and
+        "body height". Body weight is in kg, and the body height is
+        in cm. generate BMI (kg/m\^2) from these two entries.
+-   ECOG score: ECOG.csv/EcogValue
+-   Complete metabolic panel(CMP) (Albumin, Alkaline, ALT, Bilirubin,
+    Calcium, Carbon dioxide, Chloride, Creatinine, eGFR, Potassium,
+    Protein, Sodium, HCT, HGB, Lymphocyte #, Neutrophil \#) :
+    -   Lab.csv/TestResultCleaned
+    -   Lab.csv/TestBaseName : filter to the CMP
+-   Categorical CMP: Take CMP, and discretize into Above, Average, Below
+    using website
+    (<https://www.ucsfhealth.org/medical-tests/comprehensive-metabolic-panel>)
+    -   <https://www.ncbi.nlm.nih.gov/books/NBK204/#>:\~:text=The%20normal%20serum%20protein%20level,according%20to%20the%20individual%20laboratory.
+-   Complete blood count(CBC) (Platelet, RBC, WBC) :
+    -   Lab.csv/TestResultCleaned
+    -   Lab.csv/TestBaseName : filter to the CBC
+-   Categorical CBC: Take CBC, and discretize into Above, Average, Below
+    using website
+    -   <https://www.ncbi.nlm.nih.gov/books/NBK2263/table/ch1.T1/>
 
-
-  
-  
-Albumin: 3.4 to 5.4 g/dL (34 to 54 g/L)
-Alkaline phosphatase: 20 to 130 U/L
-ALT (alanine aminotransferase): 4 to 36 U/L
-AST (aspartate aminotransferase): 8 to 33 U/L
-BUN (blood urea nitrogen): 6 to 20 mg/dL (2.14 to 7.14 mmol/L)
-Calcium: 8.5 to 10.2 mg/dL (2.13 to 2.55 mmol/L)
-Chloride: 96 to 106 mEq/L (96 to 106 mmol/L)
-CO2 (carbon dioxide): 23 to 29 mEq/L (23 to 29 mmol/L)
-Creatinine: 0.6 to 1.3 mg/dL (53 to 114.9 µmol/L)
-Glucose: 70 to 100 mg/dL (3.9 to 5.6 mmol/L)
-Potassium: 3.7 to 5.2 mEq/L (3.70 to 5.20 mmol/L)
-Sodium: 135 to 145 mEq/L (135 to 145 mmol/L)
-Total bilirubin: 0.1 to 1.2 mg/dL (2 to 21 µmol/L)
-Total protein: 6.0 to 8.3 g/dL (60 to 83 g/L)
-
-
-
+Albumin: 3.4 to 5.4 g/dL (34 to 54 g/L) Alkaline phosphatase: 20 to 130
+U/L ALT (alanine aminotransferase): 4 to 36 U/L AST (aspartate
+aminotransferase): 8 to 33 U/L BUN (blood urea nitrogen): 6 to 20 mg/dL
+(2.14 to 7.14 mmol/L) Calcium: 8.5 to 10.2 mg/dL (2.13 to 2.55 mmol/L)
+Chloride: 96 to 106 mEq/L (96 to 106 mmol/L) CO2 (carbon dioxide): 23 to
+29 mEq/L (23 to 29 mmol/L) Creatinine: 0.6 to 1.3 mg/dL (53 to 114.9
+µmol/L) Glucose: 70 to 100 mg/dL (3.9 to 5.6 mmol/L) Potassium: 3.7 to
+5.2 mEq/L (3.70 to 5.20 mmol/L) Sodium: 135 to 145 mEq/L (135 to 145
+mmol/L) Total bilirubin: 0.1 to 1.2 mg/dL (2 to 21 µmol/L) Total
+protein: 6.0 to 8.3 g/dL (60 to 83 g/L)
 
 \
 
 ## Valid targetable mutation test or PDL1 test
 
-The point of conducting this analysis is whether proceeding to provide 1L therapy before knowledge of PDL1 expression level or targetable mutation status would impact the survival. Thus, valid PDL1 test refers to test results with non-missing PDL1 expression level in the dataset. [PDL1 expression levels indicate patient's susceptibility to immumotherapy, with higher percentage indicating immunotherapy will work well on the patient.]{style="color:red;"}
+The point of conducting this analysis is whether proceeding to provide
+1L therapy before knowledge of PDL1 expression level or targetable
+mutation status would impact the survival. Thus, valid PDL1 test refers
+to test results with non-missing PDL1 expression level in the dataset.
+[PDL1 expression levels indicate patient's susceptibility to
+immumotherapy, with higher percentage indicating immunotherapy will work
+well on the patient.]{style="color:red;"}
 
-On the other hand for the targetable mutation, we have 8 different biomarkers for which we can test for mutation. They are: ALK, EGFR, BRAF, KRAS, MET, RET, ROS1, and NTRK. Clinicians typically find it useful to have at least 1 positive mutation or 2 negative mutations to make informed 1L therapy decision. Thus, any patient who have either 1 positive mutation or 2 negative mutation results are considered to have valid targetable mutation result. We identified a biomarker to be mutation positive if it had any one of the following entries in "BiomarkerStatus" column. :
+On the other hand for the targetable mutation, we have 8 different
+biomarkers for which we can test for mutation. They are: ALK, EGFR,
+BRAF, KRAS, MET, RET, ROS1, and NTRK. Clinicians typically find it
+useful to have at least 1 positive mutation or 2 negative mutations to
+make informed 1L therapy decision. Thus, any patient who have either 1
+positive mutation or 2 negative mutation results are considered to have
+valid targetable mutation result. We identified a biomarker to be
+mutation positive if it had any one of the following entries in
+"BiomarkerStatus" column. :
 
 -   Mutation positive
 
@@ -459,7 +699,8 @@ On the other hand for the targetable mutation, we have 8 different biomarkers fo
 
 -   PD-L1 positive
 
-Similarly, we identified a biomarker to be mutation negative if it had any one of the following entries in the same column. :
+Similarly, we identified a biomarker to be mutation negative if it had
+any one of the following entries in the same column. :
 
 -   Mutation negative
 
@@ -473,7 +714,14 @@ Similarly, we identified a biomarker to be mutation negative if it had any one o
 
 ## Cohort
 
-In our analysis, we assess impact of proceeding to 1L therapy without either valid PDL result or targetable mutation result. Here, we identify two cohorts. First cohort is those who proceeded to 1L therapy before either valid PDL1 or targetable mutation result were observed. Second cohort is those who received 1L therapy after observing either valid PDL1 or targetable mutation result. Therefore, cohort is a function of time from time zero until either valid PDL1 or targetable mutation result date and 1L therapy start date.
+In our analysis, we assess impact of proceeding to 1L therapy without
+either valid PDL result or targetable mutation result. Here, we identify
+two cohorts. First cohort is those who proceeded to 1L therapy before
+either valid PDL1 or targetable mutation result were observed. Second
+cohort is those who received 1L therapy after observing either valid
+PDL1 or targetable mutation result. Therefore, cohort is a function of
+time from time zero until either valid PDL1 or targetable mutation
+result date and 1L therapy start date.
 
-That is, if a patient has a record of 1L before either valid PDL1 or targetable mutation result, then the patient is identified as a
-
+That is, if a patient has a record of 1L before either valid PDL1 or
+targetable mutation result, then the patient is identified as a
