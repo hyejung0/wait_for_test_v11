@@ -584,7 +584,8 @@ data.table(
     ) |> 
   tab_caption(
     "Table 2: Baseline characteristics of aNSCLC patients included in the current analysis before and after IP weighting"
-  )
+  ) |> 
+  as_raw_html()    #this is required to omit printing html source in github.
 
 
 
