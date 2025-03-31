@@ -1,0 +1,162 @@
+---
+title: "Statistical Analysis Plan"
+subtitle: "version 1"
+author: "Hyejung Lee <hyejung.lee@utah.edu>"
+date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
+output:
+  word_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+bibliography: references.bib
+csl: nature.csl
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r include=FALSE}
+#| message: false
+#| warning: false
+
+# knitr::opts_knit$set(root.dir = "./SAP")
+# remotes::install_github('yihui/knitr')
+# library(knitr)
+library(ggplot2)
+library(officer)
+library(officedown)
+library(flextable)
+library(data.table)
+library(parallel)
+library(kableExtra)
+library(knitr)
+library(lubridate)
+library(tictoc)
+library(gt)
+
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+
+
+
+knitr::opts_chunk$set(echo = FALSE)
+
+
+
+ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+
+
+```
+
+\
+
+# Hypothesis
+
+Advanced non-small cell lung cancer (aNSCLC) patients' recommended course of treatments are identified in National Comprehensive Cancer Network (NCCN) guideline. The guideline suggests each patient to perform biopsy to identify presence of targetable mutations of certain biomarkers and PDL1 expression to make a informed decision on 1L therapy choice. This recommendation is made because targeted therapy is better for patient's survival than a standard, genetic therapy such as chemotherapy or immunotherapy. Usually, at least 1 positive mutation or 2 negative mutation status among all targetable biomarkers should be obtained to make informed decision about targetable therapy. Thus having at least 1 positive mutation or 2 negative mutation status will be referred to as *useful* mutation test result from here onward. Similarly, obtaining PDL1 expression level (from 0-100%) level, as opposed to result such as missing expression level or indeterminate result, will be referred to as *useful* PDL1 test result.
+
+The standard NCCN guideline, however, may not always be followed due to reasons such as clinician's expert knowledge and ethics. For example, heavy smokers who develop lung cancer is most likely due to smoking rather than genetic mutation. Patients who fall into this category then may receive chemotherapy right away, instead of performing and waiting for genetic or PDL1 test results. One reason for not waiting until the useful test comes out is that a complete panel of test results (combined mutation and PDL1 expression tests) usually takes about 2-3 weeks to become available. It may take longer if the biopsy samples were not good and the test results are indeterminate, requiring another round of biopsy and waiting for the result. This period of waiting without doing any treatment may be detrimental to patient's health and thus becomes an ethical issue. Therefore, the ultimate choice of whether waiting for the test result or not relies heavily on the clinician's decision.
+
+Just like the example of heavy smokers, there are some patient characteristics that are highly indicative of patient's likelihood of targetable mutation status. However, there has not yet been a quantitative evaluation of effect of proceeding to 1L therapy prior to knowing targetable mutation status in patients. In this study, we evaluate causal effect of proceeding right 1L therapy in all aNSCLC patients, as well as in some subgroups that have previously been identified as associated with the mutation status.
+
+\
+
+# Objectives
+
+**Primary Objective**: Using marginal structural model, we will develop and evaluate the effect of proceeding to 1L therapy prior to obtaining useful targetable mutation status
+
+-   Limit the number of weeks.
+-   For entire observation.
+
+**Secondary Objective**: Test impact of proceeding to 1L before useful tests become available in the following subgroups: male, female, have history of smoking, do not have history of smoking, baseline Eastern Cooperative Oncology Group (ECOG) score 0-2, baseline ECOG score 3-4, baseline albumin \< 35g/L, baseline albumin \>= 35 g/L, and Asian. 
+
+- These are the subgroups identified by Wally as having either higher or lower probability of having targetable mutation, and thus would more or less likely wait for the useful test results to become available prior to initiating 1L therapy. 
+
+\
+
+# Study Design and Population
+
+## Study Design
+
+Retrospective Cohort Study
+
+
+## Study Population
+
+
+**Data**: A nationwide Flatiron Health electronic health record (EHR)-derived de-identified database. The Flatiron Health database is a longitudinal database, comprising de-identified patient-level structured and unstructured data, curated via technology-enabled abstraction [@ma2020comparison; @birnbaum2020model]. The de-identified data originated from 280 cancer clinics (\~800 sites of care). Patients with a BirthYear of 1937 or earlier may have an adjusted BirthYear in Flatiron datasets due to patient de-identification requirements. For more information, please refer to their webpage [@zhang2025].
+
+
+**Inclusion criteria**: People who got diagnosed with aNSLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from Flatiron Health network. 
+
+1. Index date is date of aNSCLC diagnosis.
+
+
+
+**Exclusion criteria**: 
+
+1. Initiate who receive first-line (1L) therapy on or after the index date. 
+2. Receive any useful test result (either PDL1 or targetable mutation) prior to the index date
+3. Missing death or censoring date
+
+
+
+Patient attrition diagram is shown below. It shows all exclusion criteria. We excluded all patients who don't have valid survival end time and who start either the 1L therapy or valid test before advanced diagnosis date. We will explain what valid test means in the next section.
+
+```{r pt_attrition, echo=FALSE, out.width='70%', fig.cap='Figure XX: Patient attrition diagram'}
+
+
+knitr::include_graphics("./image/patient_attrition_diagram.png")
+
+```
+
+
+
+
+
+# Data Strucutre
+
+There are 9 data sets of wide and long formats. Data sets containing repeated measurements such as visits, PDL1 or targetable mutation test, or lab values will be long format. The unit of observation differs by the dataset. 
+
+
+1. Create a single date variable where useful PDL1 test results are observed in each patient. 
+2. Create a single date variable where useful targetable mutation test results are observed in each patient. 
+3. For each consecutive week after the index date, create a binary indicator variable indicating who initiated 1L therapy before receiving any useful test is out. (Cohort identification)
+4. Create baseline covariates as listed in \@ref(sec-appA)
+  a. report the percent missing of each variable overall by exposure group as in \@ref(tab:baseline-missing-mock)
+5. For each consecutive week after the index date, a long dataset is created for each patient's weekly time-varying follow-up variables listed in Appendix B. There will be a variable named $k$ which shows number of weeks since index date. When $k=0$, it refers to baseline. Suppose for an example, albumin measurement at $k=1$ represent measurements taken between $(0,7]$ days, and at $k=2$ will represent measurements taken between $(7,14]$ days.  
+6. Impute censoring date using visit and oral medication record
+
+
+```{r tbl-long_dat_example, echo=FALSE, message=FALSE}
+
+dat7<-readRDS("../../EDA_V9/dat7_Adv.rds")
+
+long_dat_mock<-dat7[1:2,]
+long_dat_mock[,PatientID:=LETTERS[1:2]]
+
+# Vector specifying the number of times to replicate each row
+replication_times <- c(3, 6)
+replication_times<-rep(row.names(long_dat_mock), times = replication_times) |> as.numeric()
+
+# Replicate rows according to the specified pattern
+replicated_df <- long_dat_mock[replication_times, ]
+replicated_df<-replicated_df[,.(PatientID,time,Gender,SmokingStatus,Albumin,Platelet)]
+setnames(replicated_df,"time","k")
+replicated_df[,k:=1:.N, by=PatientID]
+replicated_df[,k:=k-1]
+
+set.seed(55)
+replicated_df[,Albumin:=Albumin+rnorm(nrow(replicated_df), sd=10)]
+replicated_df[,Platelet:=Platelet+round(rnorm(nrow(replicated_df), sd=15))]
+
+replicated_df[,cohort:=0]
+replicated_df[PatientID=="A",cohort:=0]
+replicated_df[7:9,cohort:=1]
+
+setnames(replicated_df,"PatientID","Patient ID")
+
+flextable(data.frame(replicated_df)) |> 
+  set_caption("Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time.")
+
+
+```

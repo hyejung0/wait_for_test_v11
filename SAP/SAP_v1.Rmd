@@ -136,7 +136,7 @@ a BirthYear of 1937 or earlier may have an adjusted BirthYear in
 Flatiron datasets due to patient de-identification requirements. For
 more information, please refer to their webpage [@zhang2025].
 
-**Inclusion criteria**: People who got diagnosed with aNSLC (ICD-9 162.x
+**Inclusion criteria**: People who got diagnosed with aNSCLC (ICD-9 162.x
 or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from
 Flatiron Health network.
 
@@ -163,7 +163,68 @@ knitr::include_graphics("./image/patient_attrition_diagram.jpg")
 
 ```
 
-# Data Strucutre
+
+## Protocol (for TTE)
+
+Out initial decision is waiting until valid test is observed. 
+It is assumed that everyone has ordered test on the date of diagnosis. It's the matter of waiting. 
+We assume that the data is correctly recorded. 
+
+I need help with identifying the randomized clinical trial I want to emulate.
+
+For delayed MSM, I think I don't know how to use the people who do not have observed record of valid test result and 1L therapy date.
+
+
+```{r}
+#| echo: false
+#| eval: false
+
+
+ptData<-readRDS("ptData_time0_diag_clean_v2.rds")
+
+
+
+ptData$observe_valid__on_after_time0_PDL1 |> table()
+ptData$earliest_valid_ResultDate__on_after_time0_PDL1
+ptData[,time0_to_valid_gene_weeks:=as.numeric(interval(time0,valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+ptData[,time0_to_valid_PDL1_weeks:=as.numeric(interval(time0,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+ 
+dim(ptData) #78540
+ptData[is.na(time0_to_valid_gene_weeks) &is.na(time0_to_valid_PDL1_weeks),.N] #34684
+
+#34684/78540 =0.442 didn't wait.
+ptData[,pmin(time0_to_valid_gene_weeks,time0_to_valid_PDL1_weeks,na.rm = T)] |> 
+  hist()
+summary(ptData[,pmin(time0_to_valid_gene_weeks,time0_to_valid_PDL1_weeks,na.rm = T)])
+```
+
+```{r}
+#| echo: false
+#| eval: false
+
+
+#Generate protocol of a target trail for TTE meeting
+
+protocol<-data.table("Protocol Component"=c("Eligibility criteria",
+                                            "Treatment strategies",
+                                            "Assignment procedures",
+                                            "Follow-up period",
+                                            "Outcome",
+                                            "Causal contrasts of interest",
+                                            "Analysis plan"))
+
+protocol[,Description:=as.character(NA)]
+protocol[`Protocol Component`=="Eligibility criteria",
+         Description:="People who got diagnosed with aNCSLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from Flatiron Health network."]
+
+protocol[`Protocol Component`=="Treatment strategies",
+         Description:="Initiate first-line (1L) therapy at ..."]
+
+
+```
+
+
+# Data Structure
 
 There are 9 data sets of wide and long formats. Data sets containing
 repeated measurements such as visits, PDL1 or targetable mutation test,
@@ -178,14 +239,8 @@ the dataset.
     indicator variable indicating who initiated 1L therapy before
     receiving any useful test is out. (Cohort identification)
 4.  Create baseline covariates as listed in \@ref(sec-appA)
-
-<!-- -->
-
-a.  report the percent missing of each variable overall by exposure
-    group as in \@ref(tab:baseline-missing-mock)
-
-<!-- -->
-
+    1.  report the percent missing of each variable overall by exposure
+        group as in \@ref(tab:baseline-missing-mock)
 5.  For each consecutive week after the index date, a long dataset is
     created for each patient's weekly time-varying follow-up variables
     listed in Appendix B. There will be a variable named $k$ which shows
@@ -261,15 +316,110 @@ generality. :
 -   $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is
     week when death/censoring occurs.
 -   Define earliest valid test result date as the date when any one of
-    1) PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
-    mutations was made available to the clinician.
+    1)  PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
+        mutations was made available to the clinician.
 -   $C_k = min \{\text{end of week $k$, earliest valid test result date} \}$
 -   $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
 
-In a plane language, we have two cohorts for each time interval $k$. One
-cohort is the patient who has $A_k=0$, where 1L was
+We assume that there is no unmeasured confounding for all $\bar{a}$ and $t \geq k$[@HernanMiguelA2002Etce]
 
-\
+$$Y_{\bar{a}}(t+1) \perp A(k) | \bar{A}(k-1), \bar{L}(k)$$
+
+This assumption will be true if for all prognostic factors for $_{\bar{a}}(t+1) $
+
+
+
+```{r SMART-diagram-code}
+#| echo: false
+#| eval: false
+
+#Show the diagram. Once run, change to eval: false 
+#because I'm just saving a png file to print the picture in the next line.
+
+
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+
+# Create your diagram 
+grViz_obj <- 
+grViz("
+digraph SMART {
+  graph [rankdir = LR, splines = true, overlap = false]
+
+  # Define nodes (using boxes for steps)
+  node [shape = box, style = filled, color = lightblue]
+
+  #Eligible     [label = 'Eligible Participants']
+  FirstRandom  [label = 'Check is valid test is back']
+  T1           [label = 'If back \\n (Responder)']
+  T2           [label = 'If not back']
+  T2_NotTreated       [label = 'Not treated \\n (Non responder)']
+  T2_Treated        [label = 'Treated \\n (Responder)']
+
+  Response_ET  [label = 'ET']
+  Response_W    [label = 'W']
+  
+  SecondRandom [label = 'Second Stage Randomization']
+  T3        [label = 'If back \\n (Responder)']
+  T4      [label = 'If not back']
+  T4_NotTreated       [label = 'Not treated \\n (Non responder)']
+  T4_Treated        [label = 'Treated \\n (Responder)']
+
+  Response_W_T3   [label = 'ET']
+  Response_ET_T4     [label = 'W']  
+  
+  # Connect nodes
+  #Eligible    -> FirstRandom
+  FirstRandom -> T1
+  FirstRandom -> T2
+
+  # Outcomes from first-stage treatments
+  T1 -> Response_W
+  T2 -> T2_NotTreated
+  T2 -> T2_Treated
+  T2_Treated -> Response_ET
+  
+  # Force SecondRandom to be to the right of Response_ET
+  Response_ET -> SecondRandom [style = invis, minlen = 2];
+  
+  # Second-stage randomization for non-responders:
+  # This edge will not force T2_NotTreated to move to the right.
+  T2_NotTreated -> SecondRandom [constraint = false];
+  
+  SecondRandom -> T3
+  SecondRandom -> T4
+  
+  # Outcomes from second-stage treatments
+  T3 -> Response_W_T3
+  T4 -> T4_NotTreated
+  T4 -> T4_Treated
+  T4_Treated -> Response_ET_T4
+}
+")
+
+
+# Convert the DiagrammeR object to SVG text
+svg_text <- export_svg(grViz_obj)
+
+# # Optionally, write it to a file or embed directly:
+# cat(svg_text)
+# # or convert to a PNG if needed:
+rsvg_png(charToRaw(svg_text), file = "./image/smart_diagram.png")
+
+```
+
+
+
+```{r SMART-diag, out.width='100%',  fig.cap="Figure XX: SMART diagram. The target trial I am trying to emulate"}
+#| eval: true
+
+knitr::include_graphics("./image/smart_diagram.png")
+
+```
+
+
+
 
 # Outcome
 
@@ -284,7 +434,7 @@ purposes. As we required up to days for survival analysis, we imputed
 date of death at the 15th of the month of death as recommended by
 Flatiron Health. This approach best approximates the results generated
 from using the exact date of death in comparative analysis pre and post
-de-dentification[@RN261].
+de-identification[@RN261].
 
 \
 
@@ -342,6 +492,9 @@ of weighting.
 
 # Statistical analysis
 
+
+I found in Robins (2000) [@robins2000marginal] that when we can estimate $W (t)$, the measure of degree to which the treatment process is statistically non-exogenous through day %t% by the random quantity, with $L(t)$ capturing all relevant time-dependent prognostic factors (i.e., confounders), then, whether or not the treatment process is statistically exogenous, the weighted logistic regression estimator of $\gamma_2$ will converge to a quantity $\beta_2$ that can be appropriately interpreted as the causal effect of treatment history on the mean of $Y$.
+
 1.  To account for missingness of baseline covariates (quantified in
     Table 1), for the ones we think are missing at random (MAR), perform
     multiple imputation with chained equations in 10 imputed
@@ -355,7 +508,25 @@ of weighting.
          imputed dataset, instead of the other way around.
 2.  For the covariates that are missing not at random (MNAR), create a
     categorical variable that includes missing as one level.
-3. Generate propensity score of initiating 1L therapy before observing valid test results using a logistic regression model as a function of all baseline covariates (Table 2)
+3.  Generate propensity score of initiating 1L therapy before observing
+    valid test results using a logistic regression model as a function
+    of all baseline covariates (Table 2)
+    i.  Generate the common support figure, which is a histogram showing
+        the distribution of PSs among study-eligible participants by
+        Wait vs. Do not wait cohort.
+4.  Use the PSs generated from step 3 to calculate the stabilized
+    inverse probability weight:
+    i.  Wait: $\frac{P(A_0=0)}{1-PS}$
+    ii. Do not wait: $\frac{P(A_0=1)}{PS}$
+5.  Calculate the baseline characteristics of before and after
+    application of IP weights. Differences between cohorts will be
+    calculated using absolute standardized mean differences (ASMD),
+    where an ASMD \> 0.1 indicates a significant difference between
+    groups[@haukoos2015propensity]. Populate Table 2 for patient
+    characteristics by pooling all 10 imputed datasets . Generate Figure
+    3 (panel A) for each weighting scheme in step 4 to graphically
+    depict the pre- and post-weighting ASMD for each characteristic.
+6.  Time-varying weights:
 
 \
 
@@ -524,8 +695,6 @@ kable(tab1_missing_mock, caption = "Table1: Mock table demonstrating format of r
 
 ```
 
-
-
 ## Table 2
 
 ```{r}
@@ -590,6 +759,7 @@ data.table(
 
 
 ```
+
 # Key variables
 
 -   time zero: Enhanced_AdvancedNSCLC.csv/AdvancedDiagnosisDate

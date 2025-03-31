@@ -1,14 +1,15 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Sat Mar 22, 2025 07:37:33 PM
+Mon Mar 31, 2025 02:55:07 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
 - [Study Design and Population](#study-design-and-population)
   - [Study Design](#study-design)
   - [Study Population](#study-population)
-- [Data Strucutre](#data-strucutre)
+  - [Protocol (for TTE)](#protocol-for-tte)
+- [Data Structure](#data-structure)
 - [Cohort](#cohort)
   - [Directed acyclic graph (DAG)](#directed-acyclic-graph-dag)
 - [Outcome](#outcome)
@@ -112,9 +113,9 @@ or earlier may have an adjusted BirthYear in Flatiron datasets due to
 patient de-identification requirements. For more information, please
 refer to their webpage<sup>3</sup>.
 
-**Inclusion criteria**: People who got diagnosed with aNSLC (ICD-9 162.x
-or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from
-Flatiron Health network.
+**Inclusion criteria**: People who got diagnosed with aNSCLC (ICD-9
+162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022
+from Flatiron Health network.
 
 1.  Index date is date of aNSCLC diagnosis.
 
@@ -141,7 +142,19 @@ Figure XX: Patient attrition diagram
 
 </div>
 
-# Data Strucutre
+## Protocol (for TTE)
+
+Out initial decision is waiting until valid test is observed. It is
+assumed that everyone has ordered test on the date of diagnosis. It’s
+the matter of waiting. We assume that the data is correctly recorded.
+
+I need help with identifying the randomized clinical trial I want to
+emulate.
+
+For delayed MSM, I think I don’t know how to use the people who do not
+have observed record of valid test result and 1L therapy date.
+
+# Data Structure
 
 There are 9 data sets of wide and long formats. Data sets containing
 repeated measurements such as visits, PDL1 or targetable mutation test,
@@ -156,14 +169,8 @@ the dataset.
     indicator variable indicating who initiated 1L therapy before
     receiving any useful test is out. (Cohort identification)
 4.  Create baseline covariates as listed in @ref(sec-appA)
-
-<!-- -->
-
-1.  report the percent missing of each variable overall by exposure
-    group as in @ref(tab:baseline-missing-mock)
-
-<!-- -->
-
+    1.  report the percent missing of each variable overall by exposure
+        group as in @ref(tab:baseline-missing-mock)
 5.  For each consecutive week after the index date, a long dataset is
     created for each patient’s weekly time-varying follow-up variables
     listed in Appendix B. There will be a variable named $k$ which shows
@@ -230,10 +237,22 @@ generality. :
 - $C_k = min \{\text{end of week $k$, earliest valid test result date} \}$
 - $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
 
-In a plane language, we have two cohorts for each time interval $k$. One
-cohort is the patient who has $A_k=0$, where 1L was
+We assume that there is no unmeasured confounding for all $\bar{a}$ and
+$t \geq k$<sup>4</sup>
 
-  
+$$Y_{\bar{a}}(t+1) \perp A(k) | \bar{A}(k-1), \bar{L}(k)$$
+
+This assumption will be true if for all prognostic factors for
+\$\_{{a}}(t+1) \$
+
+<div class="figure">
+
+<img src="./image/smart_diagram.png" alt="Figure XX: SMART diagram. The target trial I am trying to emulate" width="100%" />
+<p class="caption">
+Figure XX: SMART diagram. The target trial I am trying to emulate
+</p>
+
+</div>
 
 # Outcome
 
@@ -241,14 +260,14 @@ Death.
 
 If date of death is missing, the patient was presumed alive and was
 censored at the most recent record of valid vitals or oral medication
-dates as advised<sup>4</sup>.
+dates as advised<sup>5</sup>.
 
 Date of death is provided only up to month, for de-identification
 purposes. As we required up to days for survival analysis, we imputed
 date of death at the 15th of the month of death as recommended by
 Flatiron Health. This approach best approximates the results generated
 from using the exact date of death in comparative analysis pre and post
-de-dentification<sup>5</sup>.
+de-identification<sup>6</sup>.
 
   
 
@@ -305,10 +324,20 @@ of weighting.
 
 # Statistical analysis
 
+I found in Robins (2000)<sup>7</sup> that when we can estimate $W (t)$,
+the measure of degree to which the treatment process is statistically
+non-exogenous through day %t% by the random quantity, with $L(t)$
+capturing all relevant time-dependent prognostic factors (i.e.,
+confounders), then, whether or not the treatment process is
+statistically exogenous, the weighted logistic regression estimator of
+$\gamma_2$ will converge to a quantity $\beta_2$ that can be
+appropriately interpreted as the causal effect of treatment history on
+the mean of $Y$.
+
 1.  To account for missingness of baseline covariates (quantified in
     Table 1), for the ones we think are missing at random (MAR), perform
     multiple imputation with chained equations in 10 imputed
-    datasets<sup>6</sup>.
+    datasets<sup>8</sup>.
     1.  Weights (below) will be re-computed separately within each
         imputed data set.
     2.  Effect size and standard error estimates will be computed using
@@ -321,6 +350,22 @@ of weighting.
 3.  Generate propensity score of initiating 1L therapy before observing
     valid test results using a logistic regression model as a function
     of all baseline covariates (Table 2)
+    1.  Generate the common support figure, which is a histogram showing
+        the distribution of PSs among study-eligible participants by
+        Wait vs. Do not wait cohort.
+4.  Use the PSs generated from step 3 to calculate the stabilized
+    inverse probability weight:
+    1.  Wait: $\frac{P(A_0=0)}{1-PS}$
+    2.  Do not wait: $\frac{P(A_0=1)}{PS}$
+5.  Calculate the baseline characteristics of before and after
+    application of IP weights. Differences between cohorts will be
+    calculated using absolute standardized mean differences (ASMD),
+    where an ASMD \> 0.1 indicates a significant difference between
+    groups<sup>9</sup>. Populate Table 2 for patient characteristics by
+    pooling all 10 imputed datasets . Generate Figure 3 (panel A) for
+    each weighting scheme in step 4 to graphically depict the pre- and
+    post-weighting ASMD for each characteristic.
+6.  Time-varying weights:
 
   
 
@@ -868,9 +913,19 @@ data considerations.
 
 </div>
 
-<div id="ref-RN408" class="csl-entry">
+<div id="ref-HernanMiguelA2002Etce" class="csl-entry">
 
 <span class="csl-left-margin">4.
+</span><span class="csl-right-inline">Hernán, M. A., Brumback, B. A. &
+Robins, J. M. Estimating the causal effect of zidovudine on CD4 count
+with a marginal structural model for repeated measures. *Statistics in
+medicine* **21**, 1689–1709 (2002).</span>
+
+</div>
+
+<div id="ref-RN408" class="csl-entry">
+
+<span class="csl-left-margin">5.
 </span><span class="csl-right-inline">Long, L. [\[Methods
 considerations\] censoring strategies in real-world overall survival
 (rwOS)](https://flatironlifesciences.zendesk.com/hc/en-us/articles/360058946451--Methods-Considerations-Censoring-Strategies-in-Real-World-Overall-Survival-rwOS).
@@ -880,7 +935,7 @@ vol. 2025.</span>
 
 <div id="ref-RN261" class="csl-entry">
 
-<span class="csl-left-margin">5.
+<span class="csl-left-margin">6.
 </span><span class="csl-right-inline">Health, F. [Enhanced mortality
 V2.0/V2.1 overview and data
 considerations](https://flatironlifesciences.zendesk.com/hc/en-us/articles/360041924812-Enhanced-Mortality-V2-0-V2-1-Overview-and-Data-Considerations).
@@ -888,12 +943,30 @@ vol. 2024 (2024).</span>
 
 </div>
 
+<div id="ref-robins2000marginal" class="csl-entry">
+
+<span class="csl-left-margin">7.
+</span><span class="csl-right-inline">Robins, J. M. Marginal structural
+models versus structural nested models as tools for causal inference. in
+*Statistical models in epidemiology, the environment, and clinical
+trials* 95–133 (Springer, 2000).</span>
+
+</div>
+
 <div id="ref-white2011multiple" class="csl-entry">
 
-<span class="csl-left-margin">6.
+<span class="csl-left-margin">8.
 </span><span class="csl-right-inline">White, I. R., Royston, P. & Wood,
 A. M. Multiple imputation using chained equations: Issues and guidance
 for practice. *Statistics in medicine* **30**, 377–399 (2011).</span>
+
+</div>
+
+<div id="ref-haukoos2015propensity" class="csl-entry">
+
+<span class="csl-left-margin">9.
+</span><span class="csl-right-inline">Haukoos, J. S. & Lewis, R. J. The
+propensity score. *Jama* **314**, 1637–1638 (2015).</span>
 
 </div>
 
