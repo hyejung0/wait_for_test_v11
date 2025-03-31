@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Mon Mar 31, 2025 03:04:03 PM
+Mon Mar 31, 2025 03:11:05 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -241,8 +241,16 @@ generality. :
 
 - $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
 
-- A_k = { 1 if A\_(k-1)=1 or if 1L therapy is initiated before C_k { 0
-  if A\_(k-1)≠1 and if 1L therapy is not initiated before C_k
+- $A_k = \left\{\begin{array}{ll}1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before } C_k,\\[6pt] 0, & \text{if } A_{k-1}\neq 1 \text{ and if 1L therapy is not initiated before } C_k.\end{array}\right$
+
+$$
+A_k = \left\{
+\begin{array}{ll}
+1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before } C_k,\\[6pt]
+0, & \text{if } A_{k-1}\neq 1 \text{ and if 1L therapy is not initiated before } C_k.
+\end{array}
+\right.
+$$
 
 We assume that there is no unmeasured confounding for all $\bar{a}$ and
 $t \geq k$<sup>4</sup>
