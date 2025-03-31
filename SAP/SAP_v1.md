@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Mon Mar 31, 2025 02:55:07 PM
+Mon Mar 31, 2025 03:04:03 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -231,11 +231,18 @@ generality. :
 
 - $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is week
   when death/censoring occurs.
+
 - Define earliest valid test result date as the date when any one of
+
   1)  PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
       mutations was made available to the clinician.
-- $C_k = min \{\text{end of week $k$, earliest valid test result date} \}$
+
+- $C_k = min$ {end of week $k$, earliest valid test result date}
+
 - $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
+
+- A_k = { 1 if A\_(k-1)=1 or if 1L therapy is initiated before C_k { 0
+  if A\_(k-1)≠1 and if 1L therapy is not initiated before C_k
 
 We assume that there is no unmeasured confounding for all $\bar{a}$ and
 $t \geq k$<sup>4</sup>
