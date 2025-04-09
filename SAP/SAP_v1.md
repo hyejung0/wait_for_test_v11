@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Tue Apr 08, 2025 06:17:45 PM
+Tue Apr 08, 2025 07:28:48 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -10,6 +10,9 @@ Tue Apr 08, 2025 06:17:45 PM
   - [Study Population](#study-population)
 - [Emulate SMART trial](#emulate-smart-trial)
   - [Decision rule](#decision-rule)
+  - [Actual data for first 2
+    randomization](#actual-data-for-first-2-randomization)
+  - [problem with this scheme](#problem-with-this-scheme)
 - [Data Structure](#data-structure)
 - [Cohort](#cohort)
   - [Directed acyclic graph (DAG)](#directed-acyclic-graph-dag)
@@ -175,19 +178,20 @@ At time zero, no one has received valid test result and not one started
 treatment initiation (ET) or waiting for test result for another day
 (W). That’s the first square box `ET` and `W` shown in
 the<sup>**ref?**</sup>(fig:SMART) within `K=1` interval. Going forward,
-randomization is based on the decision rule explained below.:
+randomization is based on the decision rule explained in the next
+section.:
 
 ## Decision rule
 
 Decision rule operationalizes how to use tailoring variable to guide the
-tactical decision at the second-stage. In our project, the decision rule
-are three different tailoring variables:
+tactical decision at the following stages. In our project, the decision
+rule are three different tailoring variables:
 
 1.  For those who are assigned to early treatment, there is no further
     randomization
-2.  For those who are assigned to wait, tailoring variable is a binary
-    variable showing whether or not the valid test result was received
-    by the end of the time interval.
+2.  For those who are assigned to wait, **tailoring variable** is a
+    binary variable showing whether or not the valid test result was
+    received by the end of the time interval.
     - If test result is received, then the patient is assigned to “wait”
       in all following time interval, without any randomization
     - If test result is not received, then the patient is randomized in
@@ -202,6 +206,189 @@ result are going to be randomized the next stage.
 
 So it’s important that we balance out any confounding variable for those
 who are being randomized at each time point.
+
+## Actual data for first 2 randomization
+
+In my dataset, we have 78,689 patients who quality this entry criteria.
+
+For k=1 (day 0, day 1\], 1st randomization:
+
+- All 78,689 patients are randomized to either wait or not wait with
+  equal probability. In our target trial emulation, if the 1L therapy
+  date is observed on Day 0, the patient is randomized to “not wait”
+  (A_1=1); if not, they are randomized to “wait” (A_1=0).
+- In the dataset, 86 patients started 1L therapy on the same day,
+  meaning they were randomized to “not wait,” while 78,603 were
+  randomized to “wait.” Due to the decision rule, randomization stops
+  for the 86 patients randomized to not wait.
+- Among the 78,603 patients who were randomized to W on first day, 156
+  people received the valid test by the end of day 1. This information
+  is our **tailoring variable**. These 156 people will be automatically
+  assigned to “wait” starting day 2, and will not be randomized going
+  forward. Only the remaining 78,447 people will be randomized in day 2.
+
+For k=2 (day 1, day 2\], 2nd randomization:
+
+- The 78,447 patients are randomized to wait or not wait with equal
+  probability. In the dataset, 73 patients started 1L therapy on Day 2,
+  meaning they were randomized to ET, while 78,374 were randomized to W.
+- Among the 78,374 randomized to W, 280 got the test result back by the
+  end of day 2. These won’t be randomized next day. Only the remaining,
+  78,094 patients will be randomized in day 3.
+
+## problem with this scheme
+
+We need to adjust for confounding among individuals who are randomized
+at each time point. Previously, I discussed this with Wally and
+identified CMP, CBC, ECOG, gender, smoking status, histology,
+race/ethnicity, and age at baseline as confounders. Most of the
+time-fixed variables are observed; however, the time-varying variables
+are typically not observed at the beginning of each randomization period
+for use in IPW. This makes sense because our current randomization
+occurs on a daily basis, and most patients do not have lab values
+measured every day. Therefore, we decided to examine the measurement
+intervals for these time-varying variables. We grouped these intervals
+into 6-day periods and then identified the most recent week in which a
+lab value was observed for each person randomized during that week. For
+example, consider albumin. We examined all individuals randomized on any
+day during the first week (i.e., days 0 through 6 from time zero). This
+should include everyone, since our method requires all participants to
+be randomized at time zero. Next, we determined the most recent time at
+which an albumin measurement was taken. If an albumin measurement was
+taken during that same interval, then the latest observed week is
+recorded as week 1; if there was no albumin measurement for a person, it
+is recorded as NA. Similarly, for randomization in week 3, we selected
+all patients randomized during that week and determined the week in
+which their most recent albumin measurement was recorded. For some
+patients, the measurement may have been taken during week 3, week 2,
+week 1, or not at all.
+
+We display this for all time-varying variables in the figures below. As
+you can see, there are lots of missing for all of them. The most
+observed variable is BMI. **Tom thinks now that we need to abandon this
+project because we hardly ever observe important confounding variables
+for deciding ET vs. W.**
+
+![Longitudinal plot of expected value of body composition over time
+(year). The body compositions where the baseline age was significant are
+shown. Each subfigure belongs to a body composition, and the panels are
+provided for a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-1.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-2.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-3.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-4.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-5.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-6.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-7.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-8.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-9.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-10.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-11.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-12.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-13.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-14.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-15.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-16.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-17.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-18.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-19.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-20.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-21.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-22.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-23.png)![Longitudinal
+plot of expected value of body composition over time (year). The body
+compositions where the baseline age was significant are shown. Each
+subfigure belongs to a body composition, and the panels are provided for
+a fixed baseline
+age.](SAP_v1_files/figure-gfm/fig-percent_missing-24.png)
 
 # Data Structure
 

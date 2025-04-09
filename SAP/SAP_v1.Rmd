@@ -144,27 +144,27 @@ a BirthYear of 1937 or earlier may have an adjusted BirthYear in
 Flatiron datasets due to patient de-identification requirements. For
 more information, please refer to their webpage [@zhang2025].
 
-**Inclusion criteria**: People who got diagnosed with aNSCLC (ICD-9 162.x
-or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from
-Flatiron Health network.
+**Inclusion criteria**: People who got diagnosed with aNSCLC (ICD-9
+162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022
+from Flatiron Health network.
 
 1.  Index date is date of aNSCLC diagnosis.
 
 **Exclusion criteria**:
 
-1.  Initiate who receive first-line (1L) therapy before the index
-    date.
-2.  Receive valid test result (meaning, receiving either useful PDL1 test result or useful targetable mutation result) on or before the index
-    date.
-        - useful PDL1 test result is when there is PDL1 expression
-        - useful targetable mutation result is when there is at least 2 negative mutation results for any of the biomarkers or at least 1 positive mutation result
+1.  Initiate who receive first-line (1L) therapy before the index date.
+2.  Receive valid test result (meaning, receiving either useful PDL1
+    test result or useful targetable mutation result) on or before the
+    index date. - useful PDL1 test result is when there is PDL1
+    expression - useful targetable mutation result is when there is at
+    least 2 negative mutation results for any of the biomarkers or at
+    least 1 positive mutation result
 
-
-Patient attrition diagram is shown below (\@ref(fig:pt-attrition)). It shows all exclusion
-criteria. We excluded all patients who don't have valid survival end
-time and who start either the 1L therapy or valid test before advanced
-diagnosis date. We will explain what valid test means in the next
-section.
+Patient attrition diagram is shown below (\@ref(fig:pt-attrition)). It
+shows all exclusion criteria. We excluded all patients who don't have
+valid survival end time and who start either the 1L therapy or valid
+test before advanced diagnosis date. We will explain what valid test
+means in the next section.
 
 ```{r pt-attrition, out.width='80%', fig.cap='Figure XX: Patient attrition diagram'}
 
@@ -173,18 +173,18 @@ knitr::include_graphics("./image/patient attrition diagram_v2.png")
 
 ```
 
-
 # Emulate SMART trial
 
-We plan on solving the problem by emulating Sequential Multiple Assignment Randomized Trial (SMART) design.
+We plan on solving the problem by emulating Sequential Multiple
+Assignment Randomized Trial (SMART) design.
 
-
-SMART design is an adaptive treatment strategy. In adaptive treatment strategies, the treatment level and type is repeatedly adjusted according to the individual's need [@murphy2005experimental]. The treatment assignment at later stages is contingent upon pre‐specified criteria. We can utilize this. 
+SMART design is an adaptive treatment strategy. In adaptive treatment
+strategies, the treatment level and type is repeatedly adjusted
+according to the individual's need [@murphy2005experimental]. The
+treatment assignment at later stages is contingent upon pre‐specified
+criteria. We can utilize this.
 
 For our model, we will be making decision rule at each day.
-
-
-
 
 ```{r SMART, out.width='100%',  fig.cap="Figure XX: SMART diagram. The target trial I am trying to emulate. On the the first three time points are detailed out but it is supposed to continue indefinitely."}
 #| eval: true
@@ -193,33 +193,178 @@ For our model, we will be making decision rule at each day.
 knitr::include_graphics("./image/SMART_design_v2.png")
 ```
 
-
-
-At time zero, no one has received valid test result and not one started 1L therapy yet. Thus, everyone can be randomized to either early treatment initiation (ET) or waiting for test result for another day (W). That's the first square box `ET` and `W` shown in the @ref(fig:SMART) within `K=1` interval. Going forward, randomization is based on the decision rule explained below.:
-
-
-
+At time zero, no one has received valid test result and not one started
+1L therapy yet. Thus, everyone can be randomized to either early
+treatment initiation (ET) or waiting for test result for another day
+(W). That's the first square box `ET` and `W` shown in the
+@ref(fig:SMART) within `K=1` interval. Going forward, randomization is
+based on the decision rule explained in the next section.:
 
 ## Decision rule
 
-Decision rule operationalizes how to use tailoring variable to guide the tactical decision at the second-stage.
-In our project, the decision rule are three different tailoring variables:
+Decision rule operationalizes how to use tailoring variable to guide the
+tactical decision at the following stages. In our project, the decision
+rule are three different tailoring variables:
 
-1. For those who are assigned to early treatment, there is no further randomization
-2. For those who are assigned to wait, tailoring variable is a binary variable showing whether or not the valid test result was received by the end of the time interval. 
-    - If test result is received, then the patient is assigned to "wait" in all following time interval, without any randomization
-    - If test result is not received, then the patient is randomized in the next time interval.
-  
-  
-  Those who are randomized to ET is no longer randomized. For those who decided to wait, we observe tailoring variable at the end of the day. Which is, whether the patient received test result or not. Those who received test result are automatically assigned W from that time forward without any randomization. Only those who did not wait for the test result are going to be randomized the next stage.
+1.  For those who are assigned to early treatment, there is no further
+    randomization
+2.  For those who are assigned to wait, **tailoring variable** is a binary
+    variable showing whether or not the valid test result was received
+    by the end of the time interval.
+    -   If test result is received, then the patient is assigned to
+        "wait" in all following time interval, without any randomization
+    -   If test result is not received, then the patient is randomized
+        in the next time interval.
+
+Those who are randomized to ET is no longer randomized. For those who
+decided to wait, we observe tailoring variable at the end of the day.
+Which is, whether the patient received test result or not. Those who
+received test result are automatically assigned W from that time forward
+without any randomization. Only those who did not wait for the test
+result are going to be randomized the next stage.
+
+So it's important that we balance out any confounding variable for those
+who are being randomized at each time point.
+
+## Actual data for first 2 randomization
+
+In my dataset, we have 78,689 patients who quality this entry criteria.
+
+```{r example_code, eval=FALSE, echo=FALSE}
 
 
-So it's important that we balance out any confounding variable for those who are being randomized at each time point.
+ptData<-readRDS("ptData_time0_diag_clean_v2.rds")
+ptData[,time_to_1L:=as.numeric(interval(time0,StartDate),"days")]
+ptData[,time_to_valid_PDL1:=as.numeric(interval(time0,earliest_valid_ResultDate__on_after_time0_PDL1),"days")]
+ptData[,time_to_valid_gene:=as.numeric(interval(time0,valid_ResultDate__on_after_time0_NoPDL1),"days")]
+ptData[,time_to_valid_test:=pmin(time_to_valid_PDL1,time_to_valid_gene,na.rm = T)]
+
+#Everyone is randomized
+ptData[,min(time_to_valid_test,na.rm=T)] #1
+ptData[,min(time_to_1L,na.rm=T)] #0
+
+#Who is randomized to ET?
+ptData[time_to_1L==0,.N] #86
+ptData<-ptData[!PatientID %in%ptData[time_to_1L==0,PatientID],]
+nrow(ptData) #78603
+
+#Who got the valid test back by the end of day 1?
+ptData[time_to_valid_test==1,.N] #156
+#remove them
+ptData<-ptData[!PatientID %in%ptData[time_to_valid_test==1,PatientID],]
+
+
+#Second randomization
+ptData[time_to_1L==1,.N] #73
+ptData<-ptData[!PatientID %in%ptData[time_to_1L==1,PatientID],]
+nrow(ptData) #78374
+
+#Who got the valid test back by the end of day 2?
+ptData[time_to_valid_test==2,.N] #280
+#remove them
+ptData<-ptData[!PatientID %in%ptData[time_to_valid_test==2,PatientID],]
+nrow(ptData) #78094
+
+
+```
+
+For k=1 (day 0, day 1], 1st randomization:
+
+-   All 78,689 patients are randomized to either wait or not wait with equal probability. In our target trial emulation, if the 1L therapy date is observed on Day 0, the patient is randomized to “not wait” (A_1=1); if not, they are randomized to “wait” (A_1=0).
+-   In the dataset, 86 patients started 1L therapy on the same day, meaning they were randomized to “not wait,” while 78,603 were randomized to “wait.” Due to the decision rule, randomization stops for the 86 patients randomized to not wait.
+-   Among the 78,603 patients who were randomized to W on first day, 156 people received the valid test by the end of day 1. This information is our **tailoring variable**. These 156 people will be automatically assigned to "wait" starting day 2, and will not be randomized going forward. Only the remaining 78,447 people will be randomized in day 2.
+
+
+For k=2 (day 1, day 2], 2nd randomization:
+
+-   The 78,447 patients are randomized to wait or not wait with equal
+    probability. In the dataset, 73 patients started 1L therapy on Day
+    2, meaning they were randomized to ET, while 78,374 were
+    randomized to W.
+-   Among the 78,374 randomized to W, 280 got the test result back by the end of day 2. These won't be randomized next day. Only the remaining, 78,094 patients will be randomized in day 3.
+
+## problem with this scheme
+
+We need to adjust for confounding among individuals who are randomized at each time point. Previously, I discussed this with Wally and identified CMP, CBC, ECOG, gender, smoking status, histology, race/ethnicity, and age at baseline as confounders. Most of the time-fixed variables are observed; however, the time-varying variables are typically not observed at the beginning of each randomization period for use in IPW.
+This makes sense because our current randomization occurs on a daily basis, and most patients do not have lab values measured every day.
+Therefore, we decided to examine the measurement intervals for these time-varying variables. We grouped these intervals into 6-day periods and then identified the most recent week in which a lab value was observed for each person randomized during that week.
+For example, consider albumin. We examined all individuals randomized on any day during the first week (i.e., days 0 through 6 from time zero). This should include everyone, since our method requires all participants to be randomized at time zero. Next, we determined the most recent time at which an albumin measurement was taken. If an albumin measurement was taken during that same interval, then the latest observed week is recorded as week 1; if there was no albumin measurement for a person, it is recorded as NA. Similarly, for randomization in week 3, we selected all patients randomized during that week and determined the week in which their most recent albumin measurement was recorded. For some patients, the measurement may have been taken during week 3, week 2, week 1, or not at all.
+
+We display this for all time-varying variables in the figures below. As you can see, there are lots of missing for all of them. The most observed variable is BMI. **Tom thinks now that we need to abandon this project because we hardly ever observe important confounding variables for deciding ET vs. W.**
+
+
+```{r, fig.width=6, fig.height=4}
+#| label: fig-percent_missing
+#| echo: false
+#| fig-cap: Longitudinal plot of expected value of body composition over time (year). The body compositions where the baseline age was significant are shown. Each subfigure belongs to a body composition, and the panels are provided for a fixed baseline age.
+#| layout-ncol: 3
+
+# #| fig-subcap:
+# #|   - Albumin
+# #|   - Alkaline
+# #|   - ALT
+
+
+#Individually plot them
+
+all_summary_out<-readRDS("../all_time_dep_measure_summary_weekly.rds")
+
+#For each week, plot barchart.
+plot_max_week<-8
+library(ggplot2)
+ggplot_max_week_lab_percent<-
+  lapply(all_summary_out, function(lab){
+    
+    lab_tmp<-lab[1:plot_max_week]
+    
+    temp<-
+      data.table(
+        "week"=rep(names(lab_tmp), sapply(lab_tmp,length)),
+        "value"=do.call(c,lab_tmp)
+      )
+    temp[,max_week:=do.call(c,sapply(lab_tmp,names))]
+    
+    # temp[,max_week:=1:.N,by=week]
+    temp[,max_week:=factor(max_week)]
+    
+    temp[,value_number:= as.numeric(sub(".*\\(([0-9.]+)\\s*%\\).*", "\\1", value))]
+    temp[,week:=as.numeric(gsub(".*_","",week))]
+    temp[,week:=factor(week)]
+    
+    ggplot(temp)+
+      geom_bar(aes(x=week,y=value_number,fill=max_week),stat="identity")+
+      ylab("percent")
+    
+  })
+#Add title
+for(i in 1:length(ggplot_max_week_lab_percent)){
+  ggplot_max_week_lab_percent[[i]]<- 
+    ggplot_max_week_lab_percent[[i]] + 
+    ggtitle(names(all_summary_out)[i]) +
+    guides(fill=guide_legend(title="latest week observed \n the variable"))+
+    xlab("Randomization week")
+}
+
+purrr::walk(ggplot_max_week_lab_percent, print)
+
+# keep_morethan_1<-body_cols_pretty[!body_cols_edit %in%names_keep_one_age]
+# plt<-lapply(keep_morethan_1,function(x){
+#     ggplot(pred_out_merge[`Body composition`==x,], aes(x = times_yr, y = predicted, col=Gender, fill=Gender)) +
+#   geom_line()+
+#   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, linetype=2)+
+#   facet_wrap( ~`Age at baseline`, scales="fixed", dir="v", strip.position = "top", ncol=3)+
+#   theme(#strip.background = element_blank(),
+#     strip.placement = "outside")+
+#   ylab("Expected value")+
+#   xlab("Time (year)")
+# })
+# purrr::walk(plt, print)
+
+```
 
 
 
-  
-  
+
 # Data Structure
 
 There are 9 data sets of wide and long formats. Data sets containing
@@ -304,26 +449,26 @@ knitr::include_graphics("./image/DAG.jpg")
 
 Figure \@ref(fig:DAG) shows directed acyclic graph of the study where:
 
--   $k =\{1,2,..., K_i\}$, number of weeks from time zero, where $K_i$ is
-    week when death/censoring occurs for the individual $i$.
+-   $k =\{1,2,..., K_i\}$, number of weeks from time zero, where $K_i$
+    is week when death/censoring occurs for the individual $i$.
 -   $Y =$ survival outcome
--   $A_k =$ time dependent intervention status, where the intervention in our case is either:
-    - wait for the valid test results before proceeding to 1L therapy ($A_k=0$)
-    - proceed to 1L therapy before observing the valid test results ($A_k=1$)
-    - where we define the valid test to be any of the below:
-      1) obtaining PDL1 expression level,
-      2) 1 positive mutation, or 
-      3)  2 negative mutations 
+-   $A_k =$ time dependent intervention status, where the intervention
+    in our case is either:
+    -   wait for the valid test results before proceeding to 1L therapy
+        ($A_k=0$)
+    -   proceed to 1L therapy before observing the valid test results
+        ($A_k=1$)
+    -   where we define the valid test to be any of the below:
+        1)  obtaining PDL1 expression level,
+        2)  1 positive mutation, or
+        3)  2 negative mutations
 -   $L_k =$ time-dependent confounder (observed)
 -   $U_k =$ time-dependent confounder (unobserved)
 
-Thus, we can fix follow up period for any $k$. Treatment strategies are visually provided in \@ref(fig:SMART-diag).
-
+Thus, we can fix follow up period for any $k$. Treatment strategies are
+visually provided in \@ref(fig:SMART-diag).
 
 <!-- - And once switched to $A_k=1$, all subsequent $A_k$ values are fixed at 1. -->
-
-
-
 
 ```{r SMART-diagram-code}
 #| echo: false
@@ -402,8 +547,6 @@ rsvg_png(charToRaw(svg_text), file = "./image/smart_diagram.png")
 
 ```
 
-
-
 ```{r SMART-diag, out.width='100%',  fig.cap="Figure XX: SMART diagram. The target trial I am trying to emulate. On the the first three time points are detailed out but it is supposed to continue indefinitely."}
 #| eval: true
 
@@ -411,10 +554,6 @@ rsvg_png(charToRaw(svg_text), file = "./image/smart_diagram.png")
 
 knitr::include_graphics("./image/SMART_design.png")
 ```
-
-
-
-
 
 ```{r SMART-diag-zoom, out.width='70%',  fig.cap="Figure XX: A zoomed version of the SMART diagram, just for one time interval."}
 #| eval: true
@@ -424,13 +563,21 @@ knitr::include_graphics("./image/SMART_design.png")
 knitr::include_graphics("./image/SMART_design_zoom.png")
 ```
 
-
-
 We will provide 4 cases
 
-1. On the first day of $k$ (for $k=1$, the beginning would be the time zero, which is date of advanced diagnosis), the patient received a valid test. This patient is assigned to $A_k=0$, meaning, the patient waited for the test result prior to doing any therapy.
-2. On the first day of $k$ (for $k=1$, the beginning would be the time zero, which is date of advanced diagnosis), the patient did not receive a valid test. The patient also did not receive any therapy. This patient is assigned to $A_k=0$.
-3. On the first day of $k$ (for $k=1$, the beginning would be the time zero, which is date of advanced diagnosis), the patient did not receive a valid test. The patient received the 1L therapy during the week. also did not receive any therapy. This patient is assigned to $A_k=0$.
+1.  On the first day of $k$ (for $k=1$, the beginning would be the time
+    zero, which is date of advanced diagnosis), the patient received a
+    valid test. This patient is assigned to $A_k=0$, meaning, the
+    patient waited for the test result prior to doing any therapy.
+2.  On the first day of $k$ (for $k=1$, the beginning would be the time
+    zero, which is date of advanced diagnosis), the patient did not
+    receive a valid test. The patient also did not receive any therapy.
+    This patient is assigned to $A_k=0$.
+3.  On the first day of $k$ (for $k=1$, the beginning would be the time
+    zero, which is date of advanced diagnosis), the patient did not
+    receive a valid test. The patient received the 1L therapy during the
+    week. also did not receive any therapy. This patient is assigned to
+    $A_k=0$.
 
 ```{r}
 #| eval: false
@@ -451,28 +598,24 @@ tmp<-merge(tmp,tmp2,by="PatientID")
 tmp
 ```
 
+We believe that there is no unmeasured confounders that are
+substantially affecting the study. Thus, we assume that all $U_k$,
+$i=1,...,K$ in Figure \@ref(fig:DAG) can be removed. This is equivalent
+to say:
 
-
-We believe that there is no unmeasured confounders that are substantially affecting the study. Thus, we assume that all $U_k$, $i=1,...,K$ in Figure \@ref(fig:DAG) can be removed. This is equivalent to say:
-
-We assume that there is no unmeasured confounding for all $\bar{a}$ and $t \geq k$[@HernanMiguelA2002Etce]
+We assume that there is no unmeasured confounding for all $\bar{a}$ and
+$t \geq k$[@HernanMiguelA2002Etce]
 
 $$Y_{\bar{a}}(t+1) \perp A(k) | \bar{A}(k-1), \bar{L}(k)$$
 
-This assumption will be true if for all prognostic factors for ${\bar{a}}(t+1)$.
+This assumption will be true if for all prognostic factors for
+${\bar{a}}(t+1)$.
 
 We assume time-varying adaptive intervention
 
-
-
 <!-- -   $C_k = min$ {end of week $k$, earliest valid test result date}  -->
+
 <!-- -   $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$ -->
-
-
-
-
-
-
 
 # Outcome
 
@@ -496,8 +639,8 @@ de-identification[@RN261].
 ## Baseline (45 variables)
 
 List of baseline covariates and their definitions are listed in
-\@ref(appA). Note that most recent measurement prior to index date
-will be used.
+\@ref(appA). Note that most recent measurement prior to index date will
+be used.
 
 1.  Socio-demographics (5): gender, age, Race/Ethnicity, Smoking status,
     histology
@@ -545,8 +688,15 @@ of weighting.
 
 # Statistical analysis
 
-
-I found in Robins (2000) [@robins2000marginal] that when we can estimate $W (t)$, the measure of degree to which the treatment process is statistically non-exogenous through day %t% by the random quantity, with $L(t)$ capturing all relevant time-dependent prognostic factors (i.e., confounders), then, whether or not the treatment process is statistically exogenous, the weighted logistic regression estimator of $\gamma_2$ will converge to a quantity $\beta_2$ that can be appropriately interpreted as the causal effect of treatment history on the mean of $Y$.
+I found in Robins (2000) [@robins2000marginal] that when we can estimate
+$W (t)$, the measure of degree to which the treatment process is
+statistically non-exogenous through day %t% by the random quantity, with
+$L(t)$ capturing all relevant time-dependent prognostic factors (i.e.,
+confounders), then, whether or not the treatment process is
+statistically exogenous, the weighted logistic regression estimator of
+$\gamma_2$ will converge to a quantity $\beta_2$ that can be
+appropriately interpreted as the causal effect of treatment history on
+the mean of $Y$.
 
 1.  To account for missingness of baseline covariates (quantified in
     Table 1), for the ones we think are missing at random (MAR), perform
@@ -949,24 +1099,19 @@ result date and 1L therapy start date.
 That is, if a patient has a record of 1L before either valid PDL1 or
 targetable mutation result, then the patient is identified as a
 
-
-
-
-
-
 \
-
 
 ## Protocol (for TTE)
 
-Out initial decision is waiting until valid test is observed. 
-It is assumed that everyone has ordered test on the date of diagnosis. It's the matter of waiting. 
-We assume that the data is correctly recorded. 
+Out initial decision is waiting until valid test is observed. It is
+assumed that everyone has ordered test on the date of diagnosis. It's
+the matter of waiting. We assume that the data is correctly recorded.
 
-I need help with identifying the randomized clinical trial I want to emulate.
+I need help with identifying the randomized clinical trial I want to
+emulate.
 
-For delayed MSM, I think I don't know how to use the people who do not have observed record of valid test result and 1L therapy date.
-
+For delayed MSM, I think I don't know how to use the people who do not
+have observed record of valid test result and 1L therapy date.
 
 ```{r}
 #| echo: false
@@ -1015,5 +1160,3 @@ protocol[`Protocol Component`=="Treatment strategies",
 
 
 ```
-
-
