@@ -1,14 +1,15 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Mon Mar 31, 2025 03:11:05 PM
+Tue Apr 08, 2025 06:17:45 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
 - [Study Design and Population](#study-design-and-population)
   - [Study Design](#study-design)
   - [Study Population](#study-population)
-  - [Protocol (for TTE)](#protocol-for-tte)
+- [Emulate SMART trial](#emulate-smart-trial)
+  - [Decision rule](#decision-rule)
 - [Data Structure](#data-structure)
 - [Cohort](#cohort)
   - [Directed acyclic graph (DAG)](#directed-acyclic-graph-dag)
@@ -18,7 +19,7 @@ Mon Mar 31, 2025 03:11:05 PM
   - [Time-varying (40 variables)](#time-varying-40-variables)
 - [Statistical analysis](#statistical-analysis)
 - [Appendices](#appendices)
-  - [Appendix A: List of baseline covariates](#sec-appA)
+  - [Appendix A: List of baseline covariates](#appA)
 - [Tables](#tables)
   - [Table 1](#table-1)
   - [Table 2](#table-2)
@@ -26,6 +27,7 @@ Mon Mar 31, 2025 03:11:05 PM
   - [Valid targetable mutation test or PDL1
     test](#valid-targetable-mutation-test-or-pdl1-test)
   - [Cohort](#cohort-1)
+  - [Protocol (for TTE)](#protocol-for-tte)
 
   
 
@@ -99,7 +101,7 @@ baseline albumin \< 35g/L, baseline albumin \>= 35 g/L, and Asian.
 
 ## Study Design
 
-Retrospective Cohort Study
+Retrospective Cohort Study…
 
 ## Study Population
 
@@ -121,38 +123,85 @@ from Flatiron Health network.
 
 **Exclusion criteria**:
 
-1.  Initiate who receive first-line (1L) therapy on or after the index
-    date.
-2.  Receive any useful test result (either PDL1 or targetable mutation)
-    prior to the index date
-3.  Missing death or censoring date
+1.  Initiate who receive first-line (1L) therapy before the index date.
+2.  Receive valid test result (meaning, receiving either useful PDL1
+    test result or useful targetable mutation result) on or before the
+    index date. - useful PDL1 test result is when there is PDL1
+    expression - useful targetable mutation result is when there is at
+    least 2 negative mutation results for any of the biomarkers or at
+    least 1 positive mutation result
 
-Patient attrition diagram is shown below. It shows all exclusion
-criteria. We excluded all patients who don’t have valid survival end
-time and who start either the 1L therapy or valid test before advanced
-diagnosis date. We will explain what valid test means in the next
-section.
+Patient attrition diagram is shown below (@ref(fig:pt-attrition)). It
+shows all exclusion criteria. We excluded all patients who don’t have
+valid survival end time and who start either the 1L therapy or valid
+test before advanced diagnosis date. We will explain what valid test
+means in the next section.
 
 <div class="figure">
 
-<img src="./image/patient_attrition_diagram.jpg" alt="Figure XX: Patient attrition diagram" width="70%" />
+<img src="./image/patient attrition diagram_v2.png" alt="Figure XX: Patient attrition diagram" width="80%" />
 <p class="caption">
 Figure XX: Patient attrition diagram
 </p>
 
 </div>
 
-## Protocol (for TTE)
+# Emulate SMART trial
 
-Out initial decision is waiting until valid test is observed. It is
-assumed that everyone has ordered test on the date of diagnosis. It’s
-the matter of waiting. We assume that the data is correctly recorded.
+We plan on solving the problem by emulating Sequential Multiple
+Assignment Randomized Trial (SMART) design.
 
-I need help with identifying the randomized clinical trial I want to
-emulate.
+SMART design is an adaptive treatment strategy. In adaptive treatment
+strategies, the treatment level and type is repeatedly adjusted
+according to the individual’s need<sup>4</sup>. The treatment assignment
+at later stages is contingent upon pre‐specified criteria. We can
+utilize this.
 
-For delayed MSM, I think I don’t know how to use the people who do not
-have observed record of valid test result and 1L therapy date.
+For our model, we will be making decision rule at each day.
+
+<div class="figure">
+
+<img src="./image/SMART_design_v2.png" alt="Figure XX: SMART diagram. The target trial I am trying to emulate. On the the first three time points are detailed out but it is supposed to continue indefinitely." width="100%" />
+<p class="caption">
+Figure XX: SMART diagram. The target trial I am trying to emulate. On
+the the first three time points are detailed out but it is supposed to
+continue indefinitely.
+</p>
+
+</div>
+
+At time zero, no one has received valid test result and not one started
+1L therapy yet. Thus, everyone can be randomized to either early
+treatment initiation (ET) or waiting for test result for another day
+(W). That’s the first square box `ET` and `W` shown in
+the<sup>**ref?**</sup>(fig:SMART) within `K=1` interval. Going forward,
+randomization is based on the decision rule explained below.:
+
+## Decision rule
+
+Decision rule operationalizes how to use tailoring variable to guide the
+tactical decision at the second-stage. In our project, the decision rule
+are three different tailoring variables:
+
+1.  For those who are assigned to early treatment, there is no further
+    randomization
+2.  For those who are assigned to wait, tailoring variable is a binary
+    variable showing whether or not the valid test result was received
+    by the end of the time interval.
+    - If test result is received, then the patient is assigned to “wait”
+      in all following time interval, without any randomization
+    - If test result is not received, then the patient is randomized in
+      the next time interval.
+
+Those who are randomized to ET is no longer randomized. For those who
+decided to wait, we observe tailoring variable at the end of the day.
+Which is, whether the patient received test result or not. Those who
+received test result are automatically assigned W from that time forward
+without any randomization. Only those who did not wait for the test
+result are going to be randomized the next stage.
+
+So it’s important that we balance out any confounding variable for those
+who are being randomized at each time point.
 
 # Data Structure
 
@@ -168,7 +217,7 @@ the dataset.
 3.  For each consecutive week after the index date, create a binary
     indicator variable indicating who initiated 1L therapy before
     receiving any useful test is out. (Cohort identification)
-4.  Create baseline covariates as listed in @ref(sec-appA)
+4.  Create baseline covariates as listed in @ref(appA)
     1.  report the percent missing of each variable overall by exposure
         group as in @ref(tab:baseline-missing-mock)
 5.  For each consecutive week after the index date, a long dataset is
@@ -197,7 +246,7 @@ the dataset.
 Table 1. Example dataset: An expected sample of the dataset for the
 baseline and follow-up variables for two patients. Gender and smoking
 status are baseline covariates that do not change over time. Albumin and
-Platelet are the tiem-dependent covariates that are measured each week
+Platelet are the time-dependent covariates that are measured each week
 (k). Cohort is the exposure variables that can change over time.
 
   
@@ -223,51 +272,83 @@ or dead.
 
 </div>
 
-@ref{fig-DAG}
+Figure @ref(fig:DAG) shows directed acyclic graph of the study where:
 
-We define time-varying cohort variable at each $k$ for a patient as
-follows. For simplicity, we will drop $i$ in $K_i$ without loss of
-generality. :
+- $k =\{1,2,..., K_i\}$, number of weeks from time zero, where $K_i$ is
+  week when death/censoring occurs for the individual $i$.
+- $Y =$ survival outcome
+- $A_k =$ time dependent intervention status, where the intervention in
+  our case is either:
+  - wait for the valid test results before proceeding to 1L therapy
+    ($A_k=0$)
+  - proceed to 1L therapy before observing the valid test results
+    ($A_k=1$)
+  - where we define the valid test to be any of the below:
+    1)  obtaining PDL1 expression level,
+    2)  1 positive mutation, or
+    3)  2 negative mutations
+- $L_k =$ time-dependent confounder (observed)
+- $U_k =$ time-dependent confounder (unobserved)
 
-- $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is week
-  when death/censoring occurs.
+Thus, we can fix follow up period for any $k$. Treatment strategies are
+visually provided in @ref(fig:SMART-diag).
 
-- Define earliest valid test result date as the date when any one of
+<!-- - And once switched to $A_k=1$, all subsequent $A_k$ values are fixed at 1. -->
 
-  1)  PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
-      mutations was made available to the clinician.
+<div class="figure">
 
-- $C_k = min$ {end of week $k$, earliest valid test result date}
+<img src="./image/SMART_design.png" alt="Figure XX: SMART diagram. The target trial I am trying to emulate. On the the first three time points are detailed out but it is supposed to continue indefinitely." width="100%" />
+<p class="caption">
+Figure XX: SMART diagram. The target trial I am trying to emulate. On
+the the first three time points are detailed out but it is supposed to
+continue indefinitely.
+</p>
 
-- $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
+</div>
 
-- $A_k = \left\{\begin{array}{ll}1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before } C_k,\\[6pt] 0, & \text{if } A_{k-1}\neq 1 \text{ and if 1L therapy is not initiated before } C_k.\end{array}\right$
+<div class="figure">
 
-$$
-A_k = \left\{
-\begin{array}{ll}
-1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before } C_k,\\[6pt]
-0, & \text{if } A_{k-1}\neq 1 \text{ and if 1L therapy is not initiated before } C_k.
-\end{array}
-\right.
-$$
+<img src="./image/SMART_design_zoom.png" alt="Figure XX: A zoomed version of the SMART diagram, just for one time interval." width="70%" />
+<p class="caption">
+Figure XX: A zoomed version of the SMART diagram, just for one time
+interval.
+</p>
+
+</div>
+
+We will provide 4 cases
+
+1.  On the first day of $k$ (for $k=1$, the beginning would be the time
+    zero, which is date of advanced diagnosis), the patient received a
+    valid test. This patient is assigned to $A_k=0$, meaning, the
+    patient waited for the test result prior to doing any therapy.
+2.  On the first day of $k$ (for $k=1$, the beginning would be the time
+    zero, which is date of advanced diagnosis), the patient did not
+    receive a valid test. The patient also did not receive any therapy.
+    This patient is assigned to $A_k=0$.
+3.  On the first day of $k$ (for $k=1$, the beginning would be the time
+    zero, which is date of advanced diagnosis), the patient did not
+    receive a valid test. The patient received the 1L therapy during the
+    week. also did not receive any therapy. This patient is assigned to
+    $A_k=0$.
+
+We believe that there is no unmeasured confounders that are
+substantially affecting the study. Thus, we assume that all $U_k$,
+$i=1,...,K$ in Figure @ref(fig:DAG) can be removed. This is equivalent
+to say:
 
 We assume that there is no unmeasured confounding for all $\bar{a}$ and
-$t \geq k$<sup>4</sup>
+$t \geq k$<sup>5</sup>
 
 $$Y_{\bar{a}}(t+1) \perp A(k) | \bar{A}(k-1), \bar{L}(k)$$
 
 This assumption will be true if for all prognostic factors for
-\$\_{{a}}(t+1) \$
+${\bar{a}}(t+1)$.
 
-<div class="figure">
+We assume time-varying adaptive intervention
 
-<img src="./image/smart_diagram.png" alt="Figure XX: SMART diagram. The target trial I am trying to emulate" width="100%" />
-<p class="caption">
-Figure XX: SMART diagram. The target trial I am trying to emulate
-</p>
-
-</div>
+<!-- -   $C_k = min$ {end of week $k$, earliest valid test result date}  -->
+<!-- -   $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$ -->
 
 # Outcome
 
@@ -275,14 +356,14 @@ Death.
 
 If date of death is missing, the patient was presumed alive and was
 censored at the most recent record of valid vitals or oral medication
-dates as advised<sup>5</sup>.
+dates as advised<sup>6</sup>.
 
 Date of death is provided only up to month, for de-identification
 purposes. As we required up to days for survival analysis, we imputed
 date of death at the 15th of the month of death as recommended by
 Flatiron Health. This approach best approximates the results generated
 from using the exact date of death in comparative analysis pre and post
-de-identification<sup>6</sup>.
+de-identification<sup>7</sup>.
 
   
 
@@ -291,8 +372,8 @@ de-identification<sup>6</sup>.
 ## Baseline (45 variables)
 
 List of baseline covariates and their definitions are listed in
-@ref{sec-appA}. Note that most recent measurement prior to index date
-will be used.
+@ref(appA). Note that most recent measurement prior to index date will
+be used.
 
 1.  Socio-demographics (5): gender, age, Race/Ethnicity, Smoking status,
     histology
@@ -339,7 +420,7 @@ of weighting.
 
 # Statistical analysis
 
-I found in Robins (2000)<sup>7</sup> that when we can estimate $W (t)$,
+I found in Robins (2000)<sup>8</sup> that when we can estimate $W (t)$,
 the measure of degree to which the treatment process is statistically
 non-exogenous through day %t% by the random quantity, with $L(t)$
 capturing all relevant time-dependent prognostic factors (i.e.,
@@ -352,7 +433,7 @@ the mean of $Y$.
 1.  To account for missingness of baseline covariates (quantified in
     Table 1), for the ones we think are missing at random (MAR), perform
     multiple imputation with chained equations in 10 imputed
-    datasets<sup>8</sup>.
+    datasets<sup>9</sup>.
     1.  Weights (below) will be re-computed separately within each
         imputed data set.
     2.  Effect size and standard error estimates will be computed using
@@ -376,7 +457,7 @@ the mean of $Y$.
     application of IP weights. Differences between cohorts will be
     calculated using absolute standardized mean differences (ASMD),
     where an ASMD \> 0.1 indicates a significant difference between
-    groups<sup>9</sup>. Populate Table 2 for patient characteristics by
+    groups<sup>10</sup>. Populate Table 2 for patient characteristics by
     pooling all 10 imputed datasets . Generate Figure 3 (panel A) for
     each weighting scheme in step 4 to graphically depict the pre- and
     post-weighting ASMD for each characteristic.
@@ -896,6 +977,20 @@ result date and 1L therapy start date.
 That is, if a patient has a record of 1L before either valid PDL1 or
 targetable mutation result, then the patient is identified as a
 
+  
+
+## Protocol (for TTE)
+
+Out initial decision is waiting until valid test is observed. It is
+assumed that everyone has ordered test on the date of diagnosis. It’s
+the matter of waiting. We assume that the data is correctly recorded.
+
+I need help with identifying the randomized clinical trial I want to
+emulate.
+
+For delayed MSM, I think I don’t know how to use the people who do not
+have observed record of valid test result and 1L therapy date.
+
 <div id="refs" class="references csl-bib-body" entry-spacing="0"
 line-spacing="2">
 
@@ -928,9 +1023,18 @@ data considerations.
 
 </div>
 
-<div id="ref-HernanMiguelA2002Etce" class="csl-entry">
+<div id="ref-murphy2005experimental" class="csl-entry">
 
 <span class="csl-left-margin">4.
+</span><span class="csl-right-inline">Murphy, S. A. An experimental
+design for the development of adaptive treatment strategies. *Statistics
+in medicine* **24**, 1455–1481 (2005).</span>
+
+</div>
+
+<div id="ref-HernanMiguelA2002Etce" class="csl-entry">
+
+<span class="csl-left-margin">5.
 </span><span class="csl-right-inline">Hernán, M. A., Brumback, B. A. &
 Robins, J. M. Estimating the causal effect of zidovudine on CD4 count
 with a marginal structural model for repeated measures. *Statistics in
@@ -940,7 +1044,7 @@ medicine* **21**, 1689–1709 (2002).</span>
 
 <div id="ref-RN408" class="csl-entry">
 
-<span class="csl-left-margin">5.
+<span class="csl-left-margin">6.
 </span><span class="csl-right-inline">Long, L. [\[Methods
 considerations\] censoring strategies in real-world overall survival
 (rwOS)](https://flatironlifesciences.zendesk.com/hc/en-us/articles/360058946451--Methods-Considerations-Censoring-Strategies-in-Real-World-Overall-Survival-rwOS).
@@ -950,7 +1054,7 @@ vol. 2025.</span>
 
 <div id="ref-RN261" class="csl-entry">
 
-<span class="csl-left-margin">6.
+<span class="csl-left-margin">7.
 </span><span class="csl-right-inline">Health, F. [Enhanced mortality
 V2.0/V2.1 overview and data
 considerations](https://flatironlifesciences.zendesk.com/hc/en-us/articles/360041924812-Enhanced-Mortality-V2-0-V2-1-Overview-and-Data-Considerations).
@@ -960,7 +1064,7 @@ vol. 2024 (2024).</span>
 
 <div id="ref-robins2000marginal" class="csl-entry">
 
-<span class="csl-left-margin">7.
+<span class="csl-left-margin">8.
 </span><span class="csl-right-inline">Robins, J. M. Marginal structural
 models versus structural nested models as tools for causal inference. in
 *Statistical models in epidemiology, the environment, and clinical
@@ -970,7 +1074,7 @@ trials* 95–133 (Springer, 2000).</span>
 
 <div id="ref-white2011multiple" class="csl-entry">
 
-<span class="csl-left-margin">8.
+<span class="csl-left-margin">9.
 </span><span class="csl-right-inline">White, I. R., Royston, P. & Wood,
 A. M. Multiple imputation using chained equations: Issues and guidance
 for practice. *Statistics in medicine* **30**, 377–399 (2011).</span>
@@ -979,7 +1083,7 @@ for practice. *Statistics in medicine* **30**, 377–399 (2011).</span>
 
 <div id="ref-haukoos2015propensity" class="csl-entry">
 
-<span class="csl-left-margin">9.
+<span class="csl-left-margin">10.
 </span><span class="csl-right-inline">Haukoos, J. S. & Lewis, R. J. The
 propensity score. *Jama* **314**, 1637–1638 (2015).</span>
 

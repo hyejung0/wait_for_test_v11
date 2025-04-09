@@ -8,6 +8,14 @@ output:
     toc: true
     toc_depth: 2
     html_preview: true
+   # bookdown::html_document2:
+   #  self-contained: true
+   #  embed-resources: true
+   #  code-fold: true
+   #  toc: true
+   #  theme: united
+   #  toc_float: true
+   #  number-sections: true
 bibliography: references.bib
 csl: nature.csl
 editor_options: 
@@ -122,7 +130,7 @@ baseline albumin \< 35g/L, baseline albumin \>= 35 g/L, and Asian.
 
 ## Study Design
 
-Retrospective Cohort Study
+Retrospective Cohort Study...
 
 ## Study Population
 
@@ -144,86 +152,74 @@ Flatiron Health network.
 
 **Exclusion criteria**:
 
-1.  Initiate who receive first-line (1L) therapy on or after the index
+1.  Initiate who receive first-line (1L) therapy before the index
     date.
-2.  Receive any useful test result (either PDL1 or targetable mutation)
-    prior to the index date
-3.  Missing death or censoring date
+2.  Receive valid test result (meaning, receiving either useful PDL1 test result or useful targetable mutation result) on or before the index
+    date.
+        - useful PDL1 test result is when there is PDL1 expression
+        - useful targetable mutation result is when there is at least 2 negative mutation results for any of the biomarkers or at least 1 positive mutation result
 
-Patient attrition diagram is shown below. It shows all exclusion
+
+Patient attrition diagram is shown below (\@ref(fig:pt-attrition)). It shows all exclusion
 criteria. We excluded all patients who don't have valid survival end
 time and who start either the 1L therapy or valid test before advanced
 diagnosis date. We will explain what valid test means in the next
 section.
 
-```{r pt_attrition, out.width='70%', fig.cap='Figure XX: Patient attrition diagram'}
+```{r pt-attrition, out.width='80%', fig.cap='Figure XX: Patient attrition diagram'}
 
 
-knitr::include_graphics("./image/patient_attrition_diagram.jpg")
-
-```
-
-
-## Protocol (for TTE)
-
-Out initial decision is waiting until valid test is observed. 
-It is assumed that everyone has ordered test on the date of diagnosis. It's the matter of waiting. 
-We assume that the data is correctly recorded. 
-
-I need help with identifying the randomized clinical trial I want to emulate.
-
-For delayed MSM, I think I don't know how to use the people who do not have observed record of valid test result and 1L therapy date.
-
-
-```{r}
-#| echo: false
-#| eval: false
-
-
-ptData<-readRDS("ptData_time0_diag_clean_v2.rds")
-
-
-
-ptData$observe_valid__on_after_time0_PDL1 |> table()
-ptData$earliest_valid_ResultDate__on_after_time0_PDL1
-ptData[,time0_to_valid_gene_weeks:=as.numeric(interval(time0,valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
-ptData[,time0_to_valid_PDL1_weeks:=as.numeric(interval(time0,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
- 
-dim(ptData) #78540
-ptData[is.na(time0_to_valid_gene_weeks) &is.na(time0_to_valid_PDL1_weeks),.N] #34684
-
-#34684/78540 =0.442 didn't wait.
-ptData[,pmin(time0_to_valid_gene_weeks,time0_to_valid_PDL1_weeks,na.rm = T)] |> 
-  hist()
-summary(ptData[,pmin(time0_to_valid_gene_weeks,time0_to_valid_PDL1_weeks,na.rm = T)])
-```
-
-```{r}
-#| echo: false
-#| eval: false
-
-
-#Generate protocol of a target trail for TTE meeting
-
-protocol<-data.table("Protocol Component"=c("Eligibility criteria",
-                                            "Treatment strategies",
-                                            "Assignment procedures",
-                                            "Follow-up period",
-                                            "Outcome",
-                                            "Causal contrasts of interest",
-                                            "Analysis plan"))
-
-protocol[,Description:=as.character(NA)]
-protocol[`Protocol Component`=="Eligibility criteria",
-         Description:="People who got diagnosed with aNCSLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from Flatiron Health network."]
-
-protocol[`Protocol Component`=="Treatment strategies",
-         Description:="Initiate first-line (1L) therapy at ..."]
-
+knitr::include_graphics("./image/patient attrition diagram_v2.png")
 
 ```
 
 
+# Emulate SMART trial
+
+We plan on solving the problem by emulating Sequential Multiple Assignment Randomized Trial (SMART) design.
+
+
+SMART design is an adaptive treatment strategy. In adaptive treatment strategies, the treatment level and type is repeatedly adjusted according to the individual's need [@murphy2005experimental]. The treatment assignment at later stages is contingent upon pre‐specified criteria. We can utilize this. 
+
+For our model, we will be making decision rule at each day.
+
+
+
+
+```{r SMART, out.width='100%',  fig.cap="Figure XX: SMART diagram. The target trial I am trying to emulate. On the the first three time points are detailed out but it is supposed to continue indefinitely."}
+#| eval: true
+
+
+knitr::include_graphics("./image/SMART_design_v2.png")
+```
+
+
+
+At time zero, no one has received valid test result and not one started 1L therapy yet. Thus, everyone can be randomized to either early treatment initiation (ET) or waiting for test result for another day (W). That's the first square box `ET` and `W` shown in the @ref(fig:SMART) within `K=1` interval. Going forward, randomization is based on the decision rule explained below.:
+
+
+
+
+## Decision rule
+
+Decision rule operationalizes how to use tailoring variable to guide the tactical decision at the second-stage.
+In our project, the decision rule are three different tailoring variables:
+
+1. For those who are assigned to early treatment, there is no further randomization
+2. For those who are assigned to wait, tailoring variable is a binary variable showing whether or not the valid test result was received by the end of the time interval. 
+    - If test result is received, then the patient is assigned to "wait" in all following time interval, without any randomization
+    - If test result is not received, then the patient is randomized in the next time interval.
+  
+  
+  Those who are randomized to ET is no longer randomized. For those who decided to wait, we observe tailoring variable at the end of the day. Which is, whether the patient received test result or not. Those who received test result are automatically assigned W from that time forward without any randomization. Only those who did not wait for the test result are going to be randomized the next stage.
+
+
+So it's important that we balance out any confounding variable for those who are being randomized at each time point.
+
+
+
+  
+  
 # Data Structure
 
 There are 9 data sets of wide and long formats. Data sets containing
@@ -238,7 +234,7 @@ the dataset.
 3.  For each consecutive week after the index date, create a binary
     indicator variable indicating who initiated 1L therapy before
     receiving any useful test is out. (Cohort identification)
-4.  Create baseline covariates as listed in \@ref(sec-appA)
+4.  Create baseline covariates as listed in \@ref(appA)
     1.  report the percent missing of each variable overall by exposure
         group as in \@ref(tab:baseline-missing-mock)
 5.  For each consecutive week after the index date, a long dataset is
@@ -252,12 +248,11 @@ the dataset.
 
 \
 
-```{r}
+```{r long_dat_example}
 #| echo: false
 #| eval: true
 #| message: false
-#| label: tbl-long_dat_example
-# #| tbl-cap: "Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time." 
+
 
 
 dat7<-readRDS("../../EDA_V9/dat7_Adv.rds")
@@ -287,7 +282,7 @@ replicated_df[7:9,cohort:=1]
 setnames(replicated_df,"PatientID","Patient ID")
 
 knitr::kable(replicated_df,
-             caption =  "Table 1. Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time." )
+             caption =  "Table 1. Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the time-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time." )
 
 # flextable(replicated_df) |> 
 #   set_caption("Example dataset: An expected sample of the dataset for the baseline and follow-up variables for two patients. Gender and smoking status are baseline covariates that do not change over time. Albumin and Platelet are the tiem-dependent covariates that are measured each week (k). Cohort is the exposure variables that can change over time.")
@@ -301,43 +296,32 @@ knitr::kable(replicated_df,
 
 ## Directed acyclic graph (DAG)
 
-```{r fig-DAG, out.width='70%',  fig.cap="Figure XX: Directed acyclic graph. Y refers to survival outcome, A's refer to time-dependent cohort status, L's refer to time-dependent measured confounders, and U's refer to time-dependent unmeasured confounders. Index 0 is the baseline measruement. Thus, L0 contains variable such as gender and race/ethnicity. L1 then has a subset of variables of L0, where only time-varying variables are contained. The time index (k) goes from 1 through K_i, where i refers to a patient. Each patient has different number of weeks of follow-up until censored or dead."}
+```{r DAG, out.width='70%',  fig.cap="Figure XX: Directed acyclic graph. Y refers to survival outcome, A's refer to time-dependent cohort status, L's refer to time-dependent measured confounders, and U's refer to time-dependent unmeasured confounders. Index 0 is the baseline measruement. Thus, L0 contains variable such as gender and race/ethnicity. L1 then has a subset of variables of L0, where only time-varying variables are contained. The time index (k) goes from 1 through K_i, where i refers to a patient. Each patient has different number of weeks of follow-up until censored or dead."}
 
 knitr::include_graphics("./image/DAG.jpg")
 
 ```
 
-\@ref{fig-DAG}
+Figure \@ref(fig:DAG) shows directed acyclic graph of the study where:
 
-We define time-varying cohort variable at each $k$ for a patient as
-follows. For simplicity, we will drop $i$ in $K_i$ without loss of
-generality. :
+-   $k =\{1,2,..., K_i\}$, number of weeks from time zero, where $K_i$ is
+    week when death/censoring occurs for the individual $i$.
+-   $Y =$ survival outcome
+-   $A_k =$ time dependent intervention status, where the intervention in our case is either:
+    - wait for the valid test results before proceeding to 1L therapy ($A_k=0$)
+    - proceed to 1L therapy before observing the valid test results ($A_k=1$)
+    - where we define the valid test to be any of the below:
+      1) obtaining PDL1 expression level,
+      2) 1 positive mutation, or 
+      3)  2 negative mutations 
+-   $L_k =$ time-dependent confounder (observed)
+-   $U_k =$ time-dependent confounder (unobserved)
 
--   $k =\{1,2,..., K\}$, number of weeks from time zero, where $K$ is
-    week when death/censoring occurs.
--   Define earliest valid test result date as the date when any one of
-    1)  PDL1 expression level, 2)1 positive mutation, or 3) 2 negative
-        mutations was made available to the clinician.
--   $C_k = min$ {end of week $k$, earliest valid test result date} 
--   $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$
-
--   $A_k = \left\{\begin{array}{ll}1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before } C_k,\\[6pt] 0, & \text{if } A_{k-1}\neq 1 \text{ and if 1L therapy is not initiated before } C_k.\end{array}\right$
-
-$$
-A_k = \left\{
-\begin{array}{ll}
-1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before } C_k,\\[6pt]
-0, & \text{if } A_{k-1}\neq 1 \text{ and if 1L therapy is not initiated before } C_k.
-\end{array}
-\right.
-$$
+Thus, we can fix follow up period for any $k$. Treatment strategies are visually provided in \@ref(fig:SMART-diag).
 
 
-We assume that there is no unmeasured confounding for all $\bar{a}$ and $t \geq k$[@HernanMiguelA2002Etce]
+<!-- - And once switched to $A_k=1$, all subsequent $A_k$ values are fixed at 1. -->
 
-$$Y_{\bar{a}}(t+1) \perp A(k) | \bar{A}(k-1), \bar{L}(k)$$
-
-This assumption will be true if for all prognostic factors for $_{\bar{a}}(t+1) $
 
 
 
@@ -363,37 +347,35 @@ digraph SMART {
   node [shape = box, style = filled, color = lightblue]
 
   #Eligible     [label = 'Eligible Participants']
-  FirstRandom  [label = 'Check is valid test is back']
-  T1           [label = 'If back \\n (Responder)']
-  T2           [label = 'If not back']
-  T2_NotTreated       [label = 'Not treated \\n (Non responder)']
-  T2_Treated        [label = 'Treated \\n (Responder)']
+  FirstRandom  [label = 'Check if valid test is back \n (tailoring variable)']
+  T1           [label = 'If immediately back']
+  T1_w          [label = 'wait']
+  T2           [label = 'If not back \ (Randomization)']
+  T2_NotTreated       [label = 'Continued \n waiting']
+  T2_Treated        [label = 'ET']
 
-  Response_ET  [label = 'ET']
-  Response_W    [label = 'W']
-  
-  SecondRandom [label = 'Second Stage Randomization']
-  T3        [label = 'If back \\n (Responder)']
-  T4      [label = 'If not back']
-  T4_NotTreated       [label = 'Not treated \\n (Non responder)']
-  T4_Treated        [label = 'Treated \\n (Responder)']
 
-  Response_W_T3   [label = 'ET']
-  Response_ET_T4     [label = 'W']  
   
+  SecondRandom [label = 'Check if valid test is back \n (tailoring variable)']
+  T3        [label = 'If immediately back']
+  T3_w          [label = 'wait']
+  T4      [label = 'If not back \n (Randomization)']
+  T4_NotTreated     [label = 'Continued \n waiting']
+  T4_Treated        [label = 'ET']
+
+
   # Connect nodes
   #Eligible    -> FirstRandom
   FirstRandom -> T1
   FirstRandom -> T2
 
   # Outcomes from first-stage treatments
-  T1 -> Response_W
+  T1 -> T1_w
   T2 -> T2_NotTreated
   T2 -> T2_Treated
-  T2_Treated -> Response_ET
-  
+
   # Force SecondRandom to be to the right of Response_ET
-  Response_ET -> SecondRandom [style = invis, minlen = 2];
+  T2_NotTreated -> SecondRandom [style = invis, minlen = 2];
   
   # Second-stage randomization for non-responders:
   # This edge will not force T2_NotTreated to move to the right.
@@ -403,10 +385,9 @@ digraph SMART {
   SecondRandom -> T4
   
   # Outcomes from second-stage treatments
-  T3 -> Response_W_T3
+  T3 -> T3_w  
   T4 -> T4_NotTreated
   T4 -> T4_Treated
-  T4_Treated -> Response_ET_T4
 }
 ")
 
@@ -423,12 +404,72 @@ rsvg_png(charToRaw(svg_text), file = "./image/smart_diagram.png")
 
 
 
-```{r SMART-diag, out.width='100%',  fig.cap="Figure XX: SMART diagram. The target trial I am trying to emulate"}
+```{r SMART-diag, out.width='100%',  fig.cap="Figure XX: SMART diagram. The target trial I am trying to emulate. On the the first three time points are detailed out but it is supposed to continue indefinitely."}
 #| eval: true
 
-knitr::include_graphics("./image/smart_diagram.png")
+# knitr::include_graphics("./image/smart_diagram.png") #This is generated by the code block above. It's hard to include the timeline, so I will not print this.
 
+knitr::include_graphics("./image/SMART_design.png")
 ```
+
+
+
+
+
+```{r SMART-diag-zoom, out.width='70%',  fig.cap="Figure XX: A zoomed version of the SMART diagram, just for one time interval."}
+#| eval: true
+
+# knitr::include_graphics("./image/smart_diagram.png") #This is generated by the code block above. It's hard to include the timeline, so I will not print this.
+
+knitr::include_graphics("./image/SMART_design_zoom.png")
+```
+
+
+
+We will provide 4 cases
+
+1. On the first day of $k$ (for $k=1$, the beginning would be the time zero, which is date of advanced diagnosis), the patient received a valid test. This patient is assigned to $A_k=0$, meaning, the patient waited for the test result prior to doing any therapy.
+2. On the first day of $k$ (for $k=1$, the beginning would be the time zero, which is date of advanced diagnosis), the patient did not receive a valid test. The patient also did not receive any therapy. This patient is assigned to $A_k=0$.
+3. On the first day of $k$ (for $k=1$, the beginning would be the time zero, which is date of advanced diagnosis), the patient did not receive a valid test. The patient received the 1L therapy during the week. also did not receive any therapy. This patient is assigned to $A_k=0$.
+
+```{r}
+#| eval: false
+#| include: false
+
+
+
+ptData<-readRDS("ptData_time0_diag_clean_v2.rds")
+ptData[,.(time0, earliest_valid_ResultDate__on_after_time0_PDL1, valid_ResultDate__on_after_time0_NoPDL1)]
+
+tmp<-ptData[,any(c(earliest_valid_ResultDate__on_after_time0_PDL1,valid_ResultDate__on_after_time0_NoPDL1)==time0),by=PatientID]
+setnames(tmp,"V1","valid_test_on_time0")
+tmp[,table(V1, useNA = "ifany")]
+tmp2<-ptData[,StartDate==time0,by=PatientID]
+setnames(tmp2,"V1","therapy_on_time0")
+
+tmp<-merge(tmp,tmp2,by="PatientID")
+tmp
+```
+
+
+
+We believe that there is no unmeasured confounders that are substantially affecting the study. Thus, we assume that all $U_k$, $i=1,...,K$ in Figure \@ref(fig:DAG) can be removed. This is equivalent to say:
+
+We assume that there is no unmeasured confounding for all $\bar{a}$ and $t \geq k$[@HernanMiguelA2002Etce]
+
+$$Y_{\bar{a}}(t+1) \perp A(k) | \bar{A}(k-1), \bar{L}(k)$$
+
+This assumption will be true if for all prognostic factors for ${\bar{a}}(t+1)$.
+
+We assume time-varying adaptive intervention
+
+
+
+<!-- -   $C_k = min$ {end of week $k$, earliest valid test result date}  -->
+<!-- -   $A_k =\begin{cases} 1, & \text{if } A_{k-1}=1 \text{ or if 1L therapy is initiated before }C_k \\  0, & \text{if } A_{k-1} \neq 1 \text{ and if 1L therapy is not initiated before } C_k \end{cases}$ -->
+
+
+
 
 
 
@@ -455,7 +496,7 @@ de-identification[@RN261].
 ## Baseline (45 variables)
 
 List of baseline covariates and their definitions are listed in
-\@ref{sec-appA}. Note that most recent measurement prior to index date
+\@ref(appA). Note that most recent measurement prior to index date
 will be used.
 
 1.  Socio-demographics (5): gender, age, Race/Ethnicity, Smoking status,
@@ -544,7 +585,7 @@ I found in Robins (2000) [@robins2000marginal] that when we can estimate $W (t)$
 
 # Appendices {.appendix}
 
-## Appendix A: List of baseline covariates {#sec-appA}
+## Appendix A: List of baseline covariates {#appA}
 
 ```{r}
 #| echo: false
@@ -684,11 +725,10 @@ kable(baseline_cov2)
 
 ## Table 1
 
-```{r}
+```{r baseline-missing-mock}
 #| echo: false
 #| eval: true
 #| message: false
-#| label: tbl-baseline-missing-mock
 
 
 # #| tbl-colwidths: []
@@ -908,3 +948,72 @@ result date and 1L therapy start date.
 
 That is, if a patient has a record of 1L before either valid PDL1 or
 targetable mutation result, then the patient is identified as a
+
+
+
+
+
+
+\
+
+
+## Protocol (for TTE)
+
+Out initial decision is waiting until valid test is observed. 
+It is assumed that everyone has ordered test on the date of diagnosis. It's the matter of waiting. 
+We assume that the data is correctly recorded. 
+
+I need help with identifying the randomized clinical trial I want to emulate.
+
+For delayed MSM, I think I don't know how to use the people who do not have observed record of valid test result and 1L therapy date.
+
+
+```{r}
+#| echo: false
+#| eval: false
+
+
+ptData<-readRDS("ptData_time0_diag_clean_v2.rds")
+
+
+
+ptData$observe_valid__on_after_time0_PDL1 |> table()
+ptData$earliest_valid_ResultDate__on_after_time0_PDL1
+ptData[,time0_to_valid_gene_weeks:=as.numeric(interval(time0,valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+ptData[,time0_to_valid_PDL1_weeks:=as.numeric(interval(time0,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+ 
+dim(ptData) #78540
+ptData[is.na(time0_to_valid_gene_weeks) &is.na(time0_to_valid_PDL1_weeks),.N] #34684
+
+#34684/78540 =0.442 didn't wait.
+ptData[,pmin(time0_to_valid_gene_weeks,time0_to_valid_PDL1_weeks,na.rm = T)] |> 
+  hist()
+summary(ptData[,pmin(time0_to_valid_gene_weeks,time0_to_valid_PDL1_weeks,na.rm = T)])
+```
+
+```{r}
+#| echo: false
+#| eval: false
+
+
+#Generate protocol of a target trail for TTE meeting
+
+protocol<-data.table("Protocol Component"=c("Eligibility criteria",
+                                            "Treatment strategies",
+                                            "Assignment procedures",
+                                            "Follow-up period",
+                                            "Outcome",
+                                            "Causal contrasts of interest",
+                                            "Analysis plan"))
+
+protocol[,Description:=as.character(NA)]
+protocol[`Protocol Component`=="Eligibility criteria",
+         Description:="People who got diagnosed with aNCSLC (ICD-9 162.x or ICD-10 C34x or C39.9) from 01 January 2011, to 30 December 2022 from Flatiron Health network."]
+
+protocol[`Protocol Component`=="Treatment strategies",
+         Description:="Initiate first-line (1L) therapy at ..."]
+
+
+```
+
+
