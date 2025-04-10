@@ -1,7 +1,7 @@
 Statistical Analysis Plan
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Tue Apr 08, 2025 07:28:48 PM
+Thu Apr 10, 2025 05:37:40 PM
 
 - [Hypothesis](#hypothesis)
 - [Objectives](#objectives)
@@ -13,6 +13,18 @@ Tue Apr 08, 2025 07:28:48 PM
   - [Actual data for first 2
     randomization](#actual-data-for-first-2-randomization)
   - [problem with this scheme](#problem-with-this-scheme)
+  - [Chat with Wally](#chat-with-wally)
+    - [Missing lab values](#missing-lab-values)
+    - [Inclusion criteria](#inclusion-criteria)
+    - [Randomization interval](#randomization-interval)
+- [EDA for those who have baseline Albumin, ECOG, and
+  BMI](#eda-for-those-who-have-baseline-albumin-ecog-and-bmi)
+  - [Cumulative proportion of 1L
+    initiation](#cumulative-proportion-of-1l-initiation)
+  - [Cumulative proportion of death](#cumulative-proportion-of-death)
+  - [Valid test](#valid-test)
+  - [Initiate 1L before valid test](#initiate-1l-before-valid-test)
+  - [Combined plots](#combined-plots)
 - [Data Structure](#data-structure)
 - [Cohort](#cohort)
   - [Directed acyclic graph (DAG)](#directed-acyclic-graph-dag)
@@ -389,6 +401,259 @@ compositions where the baseline age was significant are shown. Each
 subfigure belongs to a body composition, and the panels are provided for
 a fixed baseline
 age.](SAP_v1_files/figure-gfm/fig-percent_missing-24.png)
+
+## Chat with Wally
+
+Chatted with Wally on 2025 April 9th about this problem.
+
+First of all, he approved of my current definition of valid test. But he
+said that typically test are sent out as a panel. So the lab send out
+the result to the doctors when they have all of them (both PDL1 and
+genetic mutation result). That takes about 3-4 weeks. In my dataset, the
+test result dates are all different. And PDL1 result come out earlier.
+That’s because academic centers are able to send out test result
+separately even if they were sent as a panel. But in Flatiron, there are
+only small portion of academic centers. Most of them are small private
+practices who either don’t do test at all or send to commercial lab,
+which takes about 3-4 weeks for ALL result to come back together.
+
+### Missing lab values
+
+Missing baseline lab value. Most likely data issue. The patients usually
+get the lab from their primary physician and the oncologist have the
+result in hand to make diagnosis. But because these labs are performed
+outside of Flatiorn network at the patient’s primary care site, they
+don’t appear in the dataset.
+
+- Maybe for our analysis, we can restrict to those who have the lab
+  result only?
+- To see if they are confounder, we can check the distribution of
+  missing lab values in each randomization arm and also compare the
+  median time to death for those who are being randomized. If the
+  proportion missing is similar between the two randomization arms and
+  if the median time to death is similar between those who are missing
+  and not missing the value, then we could possibly restrict our samples
+  to those who have observed the lab values.
+
+When the result becomes available, the test results are sent to
+clinicians via email. And clinicans check email daily.
+
+Ususally lab variables are measured weekly only if the patients are
+healthy enough that drawing blood out from them won’t cause any harm.
+
+### Inclusion criteria
+
+Each patient can be groupped into one of the three caess:
+
+1.  PatientID does not even appear in the dataset
+    - previosly, I’ve considered them to be those who didn’t even send
+      out the biopsy. **Maybe we can take them out.**
+2.  PatientID appears in the dataset but valid test result is not
+    observed
+    - Consider these patients to have performed biopsy and sent out for
+      the result
+3.  Patient ID appers in the dataset and have valid test result.
+
+### Randomization interval
+
+There can be 4 different possibilities:
+
+1.  Never even send out for test
+    - patients are too seek and need to be treated immediately.
+    - we are not interested in these patients.
+2.  Send out for test, but don’t wait and just treat
+    - **Maybe wait for a week and start. (daily time interval I have now
+      may be too granular. change to weekly)**
+3.  Send the biopsy, wait, and start the therapy the week after
+    (informed 1L decision)
+
+  
+
+# EDA for those who have baseline Albumin, ECOG, and BMI
+
+- Number patients after exclusion criteria (+ excluding people with
+  missing censoring time): 78398
+- Baseline measurement interval: (-60 ,15\] days
+- Number who have baseline Albumin: 32067
+- Number who have baseline ECOG: 29282
+- Number who have baseline BMI: 48289
+- Number who have all Albumin, ECOG, BMI: 18654
+
+Below are the same plots as above @ref(fig:fig-percent_missing_2) &
+@ref(fig:fig-number_missing_2).
+
+<div class="figure">
+
+<img src="SAP_v1_files/figure-gfm/fig-percent_missing_2-1.png" alt="Figure XX Proportion of randomized patients observing their latest observation in each week." width="100%" />
+<p class="caption">
+Figure XX Proportion of randomized patients observing their latest
+observation in each week.
+</p>
+
+</div>
+
+<div class="figure">
+
+<img src="SAP_v1_files/figure-gfm/fig-number_missing_2-1.png" alt="Figure XX Number of randomized patients observing their latest observation in each week." width="100%" />
+<p class="caption">
+Figure XX Number of randomized patients observing their latest
+observation in each week.
+</p>
+
+</div>
+
+Below, we present the graph for those who have all baseline Albumin,
+ECOG, and BMI.
+
+<div class="figure">
+
+<img src="SAP_v1_files/figure-gfm/fig-percent_missing_2_subset-1.png" alt="Figure XX Proportion of randomized patients observing their latest observation in each week." width="100%" />
+<p class="caption">
+Figure XX Proportion of randomized patients observing their latest
+observation in each week.
+</p>
+
+</div>
+
+<div class="figure">
+
+<img src="SAP_v1_files/figure-gfm/fig-number_missing_2_subset-1.png" alt="Figure XX Number of randomized patients observing their latest observation in each week." width="100%" />
+<p class="caption">
+Figure XX Number of randomized patients observing their latest
+observation in each week.
+</p>
+
+</div>
+
+## Cumulative proportion of 1L initiation
+
+@ref(fig:prop_1L_fig) shows cumulative proportion of receiving 1L
+therapy on $k^{th}$ week since time zero.
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/prop_1L_fig-1.png"
+alt="Cumulative proportion of 1L therapy initiation on week k. The x-axis has been log transformed to better show the changes in cumulative proportion at earlier k. Total number of patients (proportion) who received 1L therapy is 14958/18654 (0.802) ." />
+<figcaption aria-hidden="true">Cumulative proportion of 1L therapy
+initiation on week k. The x-axis has been log transformed to better show
+the changes in cumulative proportion at earlier k. Total number of
+patients (proportion) who received 1L therapy is 14958/18654 (0.802)
+.</figcaption>
+</figure>
+
+## Cumulative proportion of death
+
+@ref(fig:prop_dead) shows cumulative proportion of death on $k^{th}$
+week since time zero.
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/prop_dead-1.png"
+alt="Cumulative proportion dead. The x-axis has been log transformed to better show the changes in cumulative proportion at earlier k. Total number of patients (proportion) who died is 13580/18654 (0.728) ." />
+<figcaption aria-hidden="true">Cumulative proportion dead. The x-axis
+has been log transformed to better show the changes in cumulative
+proportion at earlier k. Total number of patients (proportion) who died
+is 13580/18654 (0.728) .</figcaption>
+</figure>
+
+## Valid test
+
+This section shows cumulative proportion of patients who ever get valid
+test defined as experiencing any one of the followings:
+
+- 1 postivie mutation
+- 2 negatvie mutation
+- PDL1 expression
+
+The number (proportion) of patients who got valid test is 12229/18654
+(0.656), with the maximum $k$ when a patient proceeded immediately to 1L
+therapy being 515.
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/prop_gene-1.png"
+alt="Cumulative proportion of patients who receive useful gene test at week k. The x-axis has been log transformed to better show the changes in cumulative proportion at earlier k. Total number of patients (proportion) who received useful gene test is 12229/18654 (0.656) . The maximum K at which the valid test was observed was 515 ." />
+<figcaption aria-hidden="true">Cumulative proportion of patients who
+receive useful gene test at week k. The x-axis has been log transformed
+to better show the changes in cumulative proportion at earlier k. Total
+number of patients (proportion) who received useful gene test is
+12229/18654 (0.656) . The maximum K at which the valid test was observed
+was 515 .</figcaption>
+</figure>
+
+## Initiate 1L before valid test
+
+This section shows cumulative proportion of patients initiate 1L before
+valid test is observed.
+
+If the valid test and 1L therapy have same week, then we assume that the
+valid test result is tailoring variable that is available for
+determining the 1L therapy of the same week.
+
+<sup>**fig-1L_before_valid_gene?**</sup> shows cumulative proportion of
+proceeding to 1L therapy before receiving valid test on $k^{th}$ week
+since time zero.
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/1L_before_valid_gene-1.png"
+alt="Cumulative proportion patients who initiate 1L therapy before observing valid test. The x-axis has been log transformed to better show the changes in cumulative proportion at earlier k. Total number of patients (proportion) who proceed to 1L therapy before receiving valid test is 7335/18654 (0.393) ." />
+<figcaption aria-hidden="true">Cumulative proportion patients who
+initiate 1L therapy before observing valid test. The x-axis has been log
+transformed to better show the changes in cumulative proportion at
+earlier k. Total number of patients (proportion) who proceed to 1L
+therapy before receiving valid test is 7335/18654 (0.393) .</figcaption>
+</figure>
+
+## Combined plots
+
+In this section, we present plots of cumulative proportion of patients
+experiencing the following events in each $k$ (week):
+
+1.  Staring 1L therapy
+2.  Death
+3.  valid test
+
+**NOTE: the proportions are calculated by dividing the event by total
+number of population at time zero. It’s not an incidence. I’m NOT
+removing those people who are dead/censored when calculating
+proportion.**
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/fig-all-props-1.png"
+alt="Cumulative proportion of 1L initiation, dead, useful gene test, useful PDL1 test, useful gene or PDL1 test, and useful gene and PDL1 tests. The proportions were calculated using all patients after exclusion was applied." />
+<figcaption aria-hidden="true">Cumulative proportion of 1L initiation,
+dead, useful gene test, useful PDL1 test, useful gene or PDL1 test, and
+useful gene and PDL1 tests. The proportions were calculated using all
+patients after exclusion was applied.</figcaption>
+</figure>
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/fig-all-numbs-1.png"
+alt="Cumulative incidence of 1L initiation, dead, useful gene test, useful PDL1 test, useful gene or PDL1 test, and useful gene and PDL1 tests. The proportions were calculated using all patients after exclusion was applied." />
+<figcaption aria-hidden="true">Cumulative incidence of 1L initiation,
+dead, useful gene test, useful PDL1 test, useful gene or PDL1 test, and
+useful gene and PDL1 tests. The proportions were calculated using all
+patients after exclusion was applied.</figcaption>
+</figure>
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/fig-all-props_valid_1L-1.png"
+alt="Cumulative proportion of total 1L initiation and 1L initiation before valid test result. The proportions were calculated using all patients after exclusion was applied." />
+<figcaption aria-hidden="true">Cumulative proportion of total 1L
+initiation and 1L initiation before valid test result. The proportions
+were calculated using all patients after exclusion was
+applied.</figcaption>
+</figure>
+
+<figure>
+<img src="SAP_v1_files/figure-gfm/fig-all-num_valid_1L-1.png"
+alt="Cumulative incidence of total 1L initiation and 1L initiation before valid test result. The proportions were calculated using all patients after exclusion was applied." />
+<figcaption aria-hidden="true">Cumulative incidence of total 1L
+initiation and 1L initiation before valid test result. The proportions
+were calculated using all patients after exclusion was
+applied.</figcaption>
+</figure>
+
+  
+
+  
 
 # Data Structure
 
