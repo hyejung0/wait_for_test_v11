@@ -1,0 +1,102 @@
+---
+title: "Landmark Analysis"
+subtitle: "version 1"
+author: "Hyejung Lee <hyejung.lee@utah.edu>"
+date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    html_preview: true
+   # bookdown::html_document2:
+   #  self-contained: true
+   #  embed-resources: true
+   #  code-fold: true
+   #  toc: true
+   #  theme: united
+   #  toc_float: true
+   #  number-sections: true
+  # word_document:
+  #   toc: true
+  #   toc_depth: 2
+  #   number_sections: true 
+# bibliography: references.bib
+# csl: nature.csl
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+```{r include=FALSE}
+#| message: false
+#| warning: false
+
+# knitr::opts_knit$set(root.dir = "./SAP")
+# remotes::install_github('yihui/knitr')
+# library(knitr)
+library(ggplot2)
+library(officer)
+library(officedown)
+library(flextable)
+library(data.table)
+library(parallel)
+library(kableExtra)
+library(knitr)
+library(lubridate)
+library(tictoc)
+library(gt)
+
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+
+
+
+knitr::opts_chunk$set(echo = FALSE)
+
+
+
+ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+```
+
+
+
+# Context
+
+2025 April 14
+
+I had a meeting with Tom and Ben on last friday.
+Ben suggested that I restrict the patients to those who have:
+
+- survived to 4 weeks
+- have received test result by 4 weeks
+- Start time zero on the first day of 5th day
+- have Albumin, ECOG, and weight change by 4th week
+
+Yesterday, Tom and I chatted. 
+We will do 2 separate analysis where 
+
+- **Primary Analysis**: Have time dependent covariate by the end of 1st week
+- **Secondary Analysis**: Have time dependent covariate by the end of 4th week
+
+The purposes of this is because if we let the baseline covariate to be observed until 4th week, then there is a problem when the test result or 1L therapy starts before the baseline covariate. Suppose the 1L therapy started 1st week, but the 1st ever Albumin was observed after 2nd week. Then the baseline covariate could be affected by 1L therapy. The fact that we are letting the baseline to be anywhere between advanced diagnosis and end of 4th week is that we are assuming all time in these 4 weeks are instantaneous and that whether the 1L therapy is received before or after the first lab shouldn't matter. This assumption obviously doesn't hold so we are putting that as our secondary analysis.
+
+
+\
+
+#Exclusion
+
+We will subset samples to have:
+
+- survived to 4 weeks
+- have received test result by 4 weeks
+
+
+```{r exclusion}
+#| echo: false
+#| eval: true
+```
+
+
+ 
