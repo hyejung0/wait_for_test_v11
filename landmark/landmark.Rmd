@@ -36,6 +36,8 @@ editor_options:
 # remotes::install_github('yihui/knitr')
 # library(knitr)
 library(ggplot2)
+library(survival)
+library(survminer)
 library(officer)
 library(officedown)
 library(flextable)
@@ -46,6 +48,7 @@ library(knitr)
 library(lubridate)
 library(tictoc)
 library(gt)
+library(gtsummary)
 
 library(DiagrammeR)
 library(DiagrammeRsvg)
@@ -56,47 +59,1250 @@ library(rsvg)
 knitr::opts_chunk$set(echo = FALSE)
 
 
+# BMI<-readRDS("../BMI_overtime.rds") 
+# ECOG<-readRDS("../ECOG_overtime.rds") 
+# lab_out<-readRDS("../lab_180days.rds")
 
 ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+setDTthreads(threads = ncores)
+
 ```
-
-
 
 # Context
 
 2025 April 14
 
-I had a meeting with Tom and Ben on last friday.
-Ben suggested that I restrict the patients to those who have:
+I had a meeting with Tom and Ben on last Friday. Ben suggested that I
+restrict the patients to those who have:
 
-- survived to 4 weeks
-- have received test result by 4 weeks
-- Start time zero on the first day of 5th day
-- have Albumin, ECOG, and weight change by 4th week
+-   Survive at least four weeks post advanced diagnosis
+-   Have a valid test result by the end of the fourth week
+-   Have albumin, ECOG performance status, and weight change observed to
+    use for analysis
 
-Yesterday, Tom and I chatted. 
-We will do 2 separate analysis where 
+We break this into two different scenarios, where:
 
-- **Primary Analysis**: Have time dependent covariate by the end of 1st week
-- **Secondary Analysis**: Have time dependent covariate by the end of 4th week
+-   **Primary Analysis**: time-dependent covariates must be observed by
+    1 week post advanced diagnosis by the end of 1st week
+-   **Secondary Analysis**: time-dependent covariates must be observed
+    by 1 week post advanced diagnosis by the end of 4th week
 
-The purposes of this is because if we let the baseline covariate to be observed until 4th week, then there is a problem when the test result or 1L therapy starts before the baseline covariate. Suppose the 1L therapy started 1st week, but the 1st ever Albumin was observed after 2nd week. Then the baseline covariate could be affected by 1L therapy. The fact that we are letting the baseline to be anywhere between advanced diagnosis and end of 4th week is that we are assuming all time in these 4 weeks are instantaneous and that whether the 1L therapy is received before or after the first lab shouldn't matter. This assumption obviously doesn't hold so we are putting that as our secondary analysis.
+Primary analysis addresses potential bias when baseline covariates are
+measured after treatment assignment. Note that treatment is a binary
+variable, which is a function of test result date and 1L therapy date.
 
+Although our time zero is defined at week 5—implying that every patient
+must have at least one measurement of albumin, ECOG, and weight
+change—delayed covariate ascertainment risks adjusting for post‑baseline
+values. For example, if first‑line therapy begins in week 1 but albumin
+is first measured in week 3, that value may already reflect treatment
+effects. Restricting covariate observation to week 1 in the primary
+analysis (and comparing it to the week 4 window in the secondary
+analysis) helps approximate true baseline values at the time of advanced
+diagnosis.
 
 \
 
-#Exclusion
+# Covariate
+
+## Time-fixed covariate
+
+We will use Gender, race/ethnicity, time at advanced diagnosis,
+histology, smoking status, and age at diagnosis
+
+## Time-dependenet covariate
+
+Baseline covariate ascertainment proceeded as follows, based on expert
+recommendations:
+
+1.  Covariates and time windows
+    -   **ECOG performance status**: any assessment recorded from 2
+        months before up to 1 week after (or 4 weeks after, for secondary analysis) the date of advanced
+        diagnosis.
+    -   **Weight change (**$\geq 10$ lb loss): weight measurements from 6
+    months before up to 1 week after (or 4 weeks after, for secondary analysis) diagnosis, with at least two
+    measurements in that interval.
+    -   **Serum albumin**: binary indicator ($\leq 35 g/L$ vs.$> 35 g/L$)
+    from 6 weeks before up to 1 week after (or 4 weeks after, for secondary analysis) advanced diagnosis.
+2.  Inclusion criteria 
+Patients were retained only if they had: 
+    -   $\geq 1$ ECOG assessment in the specified window, 
+    -   $\geq 2$ weight measurements in the
+    specified window, and 
+    -   $\geq 1$ albumin measurement in the specified window.
+3.  Value selection   
+    -   ECOG and albumin: if measured on the date of
+    advanced diagnosis, that value was used; otherwise, the measurement
+    closest in time to diagnosis was selected, with preference for
+    pre‑diagnosis values.
+    -   Weight change: 
+        -   If $\geq 2$ measurements existed before diagnosis, we coded whether a $\geq 10$ lb loss occurred in the 6 months preceding diagnosis.         
+        -   If fewer than two pre‑diagnosis measurements were available, we identified the earliest occurrence of $\geq 10$ lb loss within the period from 6 months pre‑diagnosis to 1 week (or 4 weeks, for secondary analysis) post‑diagnosis. 
+        
+        
+        
+Implementation details are provided in the analysis script (new_setup_baseline_diagnosis_v3.R).
+
+
+Here, I said 4 weeks after, but it is 1 week after for primary analysis.
+
+
+```{r time-dep-vars}
+#|eval: true
+
+Albumin<-readRDS("../Albumin_overtime_landmark.rds")
+ECOG<-readRDS("../ECOG_overtime_landmark.rds")
+weight_change<-readRDS("../Weight_change_overtime_landmark.rds")
+
+```
+
+\
+
+# Exclusion
 
 We will subset samples to have:
 
-- survived to 4 weeks
-- have received test result by 4 weeks
-
+-   survived to 4 weeks
+-   have received valid test result by 4 weeks
 
 ```{r exclusion}
 #| echo: false
 #| eval: true
+
+
+ptData<-readRDS("../ptData_time0_diag_v2.rds")
+ptData[,time0_to_death_weeks:=as.numeric(interval(time0,DateOfDeath),"weeks")]
+ptData[,time_to_valid_PDL1_week:=as.numeric(interval(time0,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+ptData[,time_to_valid_gene_week:=as.numeric(interval(time0,valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+ptData[,time_to_valid_test_week:=pmin(time_to_valid_PDL1_week,time_to_valid_gene_week,na.rm = T)]
+
+
+exclusion_tab<-data.table(
+  "Exclusion"=c("Died/censored before end of week 4","Do not have any record of receiving valid test by the end of week 4"),
+  "Number excluded"=as.numeric(NA),
+  "Number remaining"=as.numeric(NA)
+)
+
+
+
+#Due to data issue, some people are missing censoring time
+# ptData[DeathInd==0 & time0_to_death_weeks<=0, .N] #442
+pt_exclude<-ptData[DeathInd==0 & time0_to_death_weeks<=0, PatientID]
+#We will exclude them 
+ptData<-ptData[!PatientID %in% pt_exclude,]
+num_beginning<-nrow(ptData)
+
+
+
+
+
+#survived up to 4 weeks 
+exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number excluded`:=ptData[time0_to_death_weeks<=4,.N]]
+exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number remaining`:=ptData[time0_to_death_weeks>4,.N]]
+
+ptData<-ptData[time0_to_death_weeks>4,]
+
+
+
+#Receive valid test result prior to the end of 4th week
+exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number excluded`:=ptData[time_to_valid_test_week>4 | is.na(time_to_valid_test_week),.N]]
+exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number remaining`:=ptData[time_to_valid_test_week<=4,.N]]
+
+
+ptData<-ptData[time_to_valid_test_week<=4]
+
+```
+
+We have `r num_beginning` patients without any exclusion.
+
+```{r}
+#| echo: false
+#| eval: true
+#| label: tbl-exclusion
+#| tbl-cap: Number of patients based on exclusion
+
+kable(exclusion_tab)
+
+```
+
+\
+
+## Primary analysis
+
+
+```{r exclusion-primary}
+#| echo: false
+#| eval: true
+
+
+#Only include people who have observed all variables
+ptData1<-copy(ptData)
+exclusion_tab1<-copy(exclusion_tab)
+
+ptData1<-ptData1[PatientID %in% Albumin$week1[observe_lab_within_window==1,PatientID],]
+
+
+ptData1<-ptData1[PatientID %in% ECOG$week1[observe_lab_within_window==1,PatientID],]
+
+ptData1<-ptData1[PatientID %in% weight_change$week1[observe_at_least_two_weight==TRUE,PatientID],]
+
+exclusion_tab1<-
+rbind(
+  exclusion_tab1,
+  data.table(
+    Exclusion="Didn't observe all variables (week 1)",
+    "Number excluded"=nrow(ptData)-nrow(ptData1),
+    "Number remaining"=nrow(ptData1)
+  )
+  
+)
 ```
 
 
- 
+
+```{r}
+#| echo: false
+#| eval: true
+#| label: tbl-exclusion_primary
+#| tbl-cap: Number of patients based on exclusion
+
+kable(exclusion_tab1)
+
+```
+
+
+
+
+\
+
+## Secondary analysis
+
+
+```{r exclusion-secondary}
+#| echo: false
+#| eval: true
+
+
+#Only include people who have observed all variables
+ptData2<-copy(ptData)
+exclusion_tab2<-copy(exclusion_tab)
+
+ptData2<-ptData2[PatientID %in% Albumin$week4[observe_lab_within_window==1,PatientID],]
+
+
+ptData2<-ptData2[PatientID %in% ECOG$week4[observe_lab_within_window==1,PatientID],]
+
+ptData2<-ptData2[PatientID %in% weight_change$week4[observe_at_least_two_weight==TRUE,PatientID],]
+
+exclusion_tab2<-
+rbind(
+  exclusion_tab2,
+  data.table(
+    Exclusion="Didn't observe all variables (week 4)",
+    "Number excluded"=nrow(ptData)-nrow(ptData2),
+    "Number remaining"=nrow(ptData2)
+  )
+  
+)
+```
+
+
+
+```{r}
+#| echo: false
+#| eval: true
+#| label: tbl-exclusion_secondary
+#| tbl-cap: Number of patients based on exclusion
+
+kable(exclusion_tab2)
+
+```
+
+
+
+\
+
+# Primary Analysis
+
+```{r primary-analysis}
+#| eval: true
+
+ptData1<-
+merge(ptData1,
+      Albumin$week1[,.(PatientID,TestResultCleaned)],
+      all.x = T)
+setnames(ptData1,"TestResultCleaned","albumin")
+ptData1[,albumin_binary:=ifelse(albumin<=35,"low","normal")]
+ptData1[,albumin_binary:=factor(albumin_binary,levels = c("normal","low"), labels = c("normal","low"))]
+
+ptData1<-
+merge(ptData1,
+      ECOG$week1[,.(PatientID,EcogValue)],
+      all.x = T)
+setnames(ptData1,"EcogValue","ECOG")
+
+
+ptData1<-
+merge(ptData1,
+      weight_change$week1[,.(PatientID,first_date_observe_losing_10lbs)],
+      all.x = T)
+ptData1[,lost_10lbs:=0]
+ptData1[!is.na(first_date_observe_losing_10lbs),lost_10lbs:=1]
+ptData1[,first_date_observe_losing_10lbs:=NULL]
+
+#Time 0 is 5th week
+ptData1[,time0:=NULL]
+ptData1[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4)+days(1))]
+
+
+#Now treatment assignment.
+ptData1[,cohort:="wait"]
+ptData1[,time_to_therapy:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
+ptData1[time_to_valid_test_week>time_to_therapy,cohort:="no_wait"]
+ptData1[,cohort:=factor(cohort,levels=c("wait","no_wait"), labels=c("wait","no_wait"))]
+
+
+#generate yearly count of advanced diagnosis date
+ptData1[,AdvancedDiagnosis_year:=year(AdvancedDiagnosisDate)]
+ptData1[,AdvancedDiagnosis_year_factor:=factor(AdvancedDiagnosis_year,levels = sort(unique(AdvancedDiagnosis_year), decreasing = F), labels = sort(unique(AdvancedDiagnosis_year), decreasing = F))]
+
+# ptData1[,min(AdvancedDiagnosis_year)] #2011
+ptData1[,AdvancedDiagnosis_year_rescale:=AdvancedDiagnosis_year-min(AdvancedDiagnosis_year)] #make first one 0.
+```
+
+
+\
+
+## Descriptive summary
+
+
+Summary table:
+
+```{r primary-descriptive-table}
+#| eval: true
+
+
+covars<-list(
+  "albumin_binary" = "Albumin (<= 35 g/L vs. > 35g/L)",
+  "lost_10lbs" = "Lost >= 10lbs",
+  "ECOG"="ECOG",
+  "SmokingStatus"="SmokingStatus",
+  "Histology"="Histology",
+  "Gender"="Gender",
+  "RaceEthnicity"="Race/Ethnicity",
+  "age_at_advDiag"="Approximate age at Advanced Diagnosis",
+  "AdvancedDiagnosis_year_rescale"="Advanced Diagnosis (year)"
+)  
+  primary_decriptive_table<-
+    tbl_summary(
+      data=ptData1[,.SD,.SDcols=c("cohort",names(covars))],
+      by="cohort",
+      label=covars,
+      missing = "ifany",
+      type = list(where(is.numeric) ~ "continuous2"),  # Use "continuous2" for multiple statistics
+      statistic = list(
+        all_continuous() ~ c("{mean} ({sd})", "{median} ({p25}, {p75})")  # Show both Mean (SD) and Median (Q1, Q3)
+      )
+    )
+
+```
+
+
+
+
+```{r}
+#| echo: false
+#| eval: true
+#| warning: false
+#| label: tbl-primary-dscriptive
+
+
+primary_decriptive_table |> 
+  as_gt() |> 
+  #  tab_header(
+  #   title = md("What's the difference between this title and caption?"),
+  #   subtitle = md("`gtcars` is an R dataset")
+  # ) |>
+  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline, without IPW weighting.")) |> 
+  as_raw_html() 
+```
+
+
+As we can observe in the table, there are only two people who are Hispanic/Latino and they are all in the cohort that did not wait for the test result prior to receiving 1L therapy. That is, there is violation of positivity assumption for causal inference with these two patients included in the analysis. In terms of propensity scores, these patients will have propensity score of 1 for not waiting for test result. Therefore, We will further exclude these patients for our primary analysis. 
+
+```{r primary-exclude-pt-for-positivity}
+#| echo: false
+#| eval: false
+
+
+#Only two patients with HispLatino RaceEthnicity
+#And they are both no wait cohort
+#Must be excluded for
+#Positivity assumption
+
+exclude_pt<-ptData1[RaceEthnicity=="HispLatino",PatientID]
+ptData1<-ptData1[!PatientID %in% exclude_pt,]
+```
+
+
+\
+
+## Inverse probability weight
+
+
+Generate IPW, and re-construct the table.
+
+```{r primary-IPW}
+#| eval: true
+#| echo: false
+#| message: false
+
+#Use logistic regression
+covar_cols<-c(
+  "albumin_binary",
+  "lost_10lbs" ,
+  "ECOG",
+  "SmokingStatus",
+  "Histology",
+  "Gender",
+  "RaceEthnicity",
+  "age_at_advDiag",
+  "AdvancedDiagnosis_year_rescale"
+)  
+
+
+this.formula<-formula(paste("cohort~", paste(covar_cols,collapse = "+"), sep=""))
+logit.fit<-glm(this.formula,data=ptData1,family="binomial")
+
+# logit.fit<-glm(cohort~albumin_binary+lost_10lbs+ECOG+SmokingStatus+Histology+Gender+RaceEthnicity+age_at_advDiag+AdvancedDiagnosis_year,data=ptData1,family="binomial")
+
+
+#propensity scores
+ptData1[,ps:=logit.fit$fitted.values]
+
+#generate weight
+ptData1[,w:=ifelse(cohort=="wait",1/ps, 1/(1-ps))]
+
+# #Propensity score plot
+# primary_ps_plot<-ggplot(ptData1, aes(x=ps,fill=cohort))+
+#   geom_density(alpha=0.2)+
+#   theme_minimal()
+# primary_ps_plot
+# 
+# ptData1[cohort=="wait",summary(w)]
+# ptData1[cohort=="no_wait",summary(w)]
+
+
+
+
+#generate stabilized weights, in case there are extreme weights
+prop_no_wait<-mean(ptData1$cohort=="no_wait")
+ptData1[,sw:=ifelse(cohort=="no_wait",prop_no_wait/ps, (1-prop_no_wait)/(1-ps))]
+
+# ptData1[cohort=="wait",summary(sw)]
+# ptData1[cohort=="no_wait",summary(sw)]
+#More balanced weight.
+
+
+
+```
+
+
+
+
+```{r code-primary-both-tables}
+#| echo: false
+#| eval: true
+#| include: false
+
+
+
+
+#before weight
+library(survey)
+library(tableone)
+
+
+
+before<-svydesign(ids= ~ 0, data=ptData1) 
+before_tab<- svyCreateTableOne(vars=covar_cols, strata = "cohort",data = before, test = FALSE)
+# print(before_tab, smd = TRUE)
+# print(before_tab, showAllLevels = TRUE, smd = TRUE)
+
+
+before_tab_rownames<-rownames(print(before_tab, showAllLevels = TRUE,smd=T))
+before_tab<-as.data.frame(print(before_tab,showAllLevels = TRUE, smd=T))
+before_tab$this.rownames<-before_tab_rownames
+
+
+
+#After weight
+
+
+after<-svydesign(ids= ~ 0, data=ptData1,weights=ptData1$sw)
+after_tab<- svyCreateTableOne(vars=covar_cols, strata = "cohort",data = after, test = FALSE)
+
+after_tab_rownames<-rownames(print(after_tab, showAllLevels = TRUE,smd=T))
+after_tab<-as.data.frame(print(after_tab, showAllLevels = TRUE,smd=T))
+colnames(after_tab)<-paste(colnames(after_tab),"sw",sep = "_")
+
+#merge the two data sets. Can I just bind them?
+# sum(before_tab$this.rownames!=after_tab_rownames) #they are same order. Just cbind them.
+# rownames(before_tab)
+temp<-cbind(before_tab[,c("this.rownames",colnames(before_tab)[colnames(before_tab)!="this.rownames"])],
+            after_tab[,c( "wait_sw","no_wait_sw","SMD_sw")])
+rownames(temp)<-NULL
+
+
+#Change row names to print
+pretty_name<-do.call(c,covars)[covar_cols]
+new_rownames<-
+sapply(temp$this.rownames,function(x){
+  
+  if(x==""|x=="n"){
+    return(x)
+  }else{
+    
+    #logical for index which name to give
+    this.index.logical<-
+    sapply(names(pretty_name),function(y){
+       stringr::str_detect(string = x,
+                     pattern = y) 
+    })
+    
+    index<-which(this.index.logical)
+    
+    #Replace the raw name with pretty name
+    newname<-
+    stringr::str_replace(string=x, pattern=names(pretty_name)[index], replacement=pretty_name[index])
+    return(newname)
+  }
+
+})
+
+temp$this.rownames<-new_rownames
+
+
+```
+
+
+```{r tbl-primary-dscriptive-both}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| tbl-cap: Summary of Patient Characteristics at Baseline.
+
+
+# build gt table
+gt(temp) |> 
+  # First two columns stay as-is:
+  cols_label(
+    this.rownames = "Variable",
+    level         = "Level",
+    # now override the 6 numeric columns’ *display* labels:
+    wait       = "Wait",
+    no_wait    = "No wait",
+    SMD        = "SMD",
+    wait_sw    = "Wait",
+    no_wait_sw = "No wait",
+    SMD_sw     = "SMD"
+  ) |> 
+  # create the two spanners:
+  tab_spanner(
+    label   = "No IPW",
+    columns = c(wait, no_wait, SMD)
+  ) |> 
+  tab_spanner(
+    label   = "IPW",
+    columns = c(wait_sw, no_wait_sw, SMD_sw)
+  ) |> 
+  # optional styling:
+  opt_align_table_header("left") |> 
+  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline, without IPW weighting.")) |> 
+  as_raw_html()  #this will display the table on
+
+```
+
+
+
+Based on the above table, applying IPW balanced out albumin, race, and age, which were our concern. Now fit Cox PH model with IPW applied.
+
+\
+
+
+## KM curve
+
+
+
+```{r fig.show="hold", out.width='49%',  fig.height=5}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: fig-primary-KMplot
+#| fig-cap: Figure XX. Kaplan-Meier (KM curve demonstrating survival probability over time. A) original data, B) IPW applied population. 
+# #| fig-subcap: ["48 patients used for original body compositions", "46 patients used for composite body compositions"]
+# #| layout-ncol: 2
+
+# #| fig-subcap: 
+# #|     - 48 patients used for original body compositions
+# #|     - 46 patients used for composite body compositions
+
+
+#Kaplan meier curve
+#display that works for HTML.
+
+source("../return_km_plot.R")
+
+
+
+
+#generate time variable
+ptData1[,time0_to_death_weeks:=as.numeric(interval(time0,DateOfDeath),"weeks")]
+no_ipw<-return_km_plot(data = ptData1,xlab_name = "Time (week)", time="time0_to_death_weeks",covar = "cohort",status ="DeathInd" ) |> suppressWarnings() #Without suppressWarnings(), I still see warning printed out in html file, even with warning: false.
+
+yes_ipw<-return_km_plot(data = ptData1,xlab_name = "Time (week)", time="time0_to_death_weeks",covar = "cohort",status ="DeathInd" ,weight = T,weight_var = "sw") |> suppressWarnings()
+
+
+#Remove legend
+# Assuming your plot is saved as 'x'
+# and add title
+no_ipw$plot <- no_ipw$plot + theme(legend.position = "none") + ggtitle("A) Without IPW")
+yes_ipw$plot <- yes_ipw$plot + theme(legend.position = "none")+ ggtitle("B) IPW")
+
+
+#subfigure a
+no_ipw
+
+#subfigure b
+yes_ipw
+
+
+
+```
+
+
+```{r primary-median-surv}
+#| echo: false
+#| eval: true
+
+
+#Just calculate median survival 
+#A function that returns median(95%CI) survival time from surfit() object
+kmplot_median_CI<-function(km_fit, digits=2){
+  #km_fit = survfit() object with binary exposure.
+  
+  temp<-as.data.frame(summary(km_fit)$table)
+  factor_levels<-rownames(temp)
+  
+  this.formula<-paste("%.",digits,"f (95%%CI: %.",digits,"f - %.",digits,"f)", sep="")
+  
+  out<-
+    lapply(factor_levels,function(x){
+      sprintf(this.formula,temp[x,"median"],temp[x,"0.95LCL"],temp[x,"0.95UCL"])
+    })
+  names(out)<-factor_levels
+  out
+}
+
+median_summary_noIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData1), digits=2)
+median_summary_yesIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData1, weights = ptData1$sw), digits=2)
+
+```
+
+
+Without IPW, the median survival of "wait" and "no wait" cohorts are `r median_summary_noIPW$"cohort=wait"`, and `r median_summary_noIPW$"cohort=no_wait"`, respectively. With IPW, however, it changes to `r median_summary_yesIPW$"cohort=wait"`, and `r median_summary_yesIPW$"cohort=no_wait"`, showing a little bit of decrease for "wait" cohort and a bit of increase for "no wait" cohort.
+
+
+## Effect of 1L before test result become available
+
+```{r primary-coxph}
+#| echo: false
+#| eval: true
+
+
+#Crude fit 
+source("../coxph.ci.coef.R")
+
+fit1<-coxph(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData1, weights=ptData1$sw, robust = T, x=TRUE)
+summary_fit1<-coxph.ci.coef(fit1,x.name="cohortno_wait",digits=3,return_num_binary_x=FALSE,robust=TRUE)
+
+
+```
+Using the IPW, we fitted a Cox PH model. From this, we conclude that the hazard rate (95% confidence interval) of death by proceeding to 1L before receiving valid test result is `r summary_fit1`. Since the null value 1 is included in the 95% CI, we conclude that proceeding to 1L therapy right away did not produce much difference. 
+
+
+\
+
+## 1L therapy distribution
+
+```{r primary-1L-code}
+#| echo: false
+#| eval: true
+#| include: false
+
+#Get the most updated classification Wally did for us
+therapy1<-fread("../../../Data/new_1L/firstLinetherapies.csv")
+therapy1<-therapy1[,.(L1therapy,CategoryEric1)]
+colnames(therapy1)<-c("LineName","Group")
+
+therapy2<-readxl::read_xlsx("../../../Data/new_1L/L1therapiesDiscordantclassesWA.xlsx") #This is the one we have to use updated by Wally
+therapy2<-data.table(therapy2)
+therapy2<-therapy2[,.(L1therapy,Akerley)]
+colnames(therapy2)<-c("LineName","Group")
+
+# intersect(therapy2$LineName,therapy1$LineName) #they are mutually exclusive!
+#Bind them
+therapy<-rbind(therapy1,therapy2)
+#make a vector out of it.
+therapy_vector<-therapy$Group
+names(therapy_vector)<-therapy$LineName
+
+therapy_vector_group<-therapy_vector[ptData1$LineName]
+ptData1[,therapy_group:=therapy_vector_group]
+
+
+
+source("../../EDA_V9/wait_trt_dist_plot_facet.R")
+plot_out<-wait_trt_dist_plot_facet(
+    dat=ptData1,
+    cohort="cohort",
+    geom_text_location_prop=0.7,
+    this.fontsize=3,
+    weight = "sw",
+    trim.percent = 5 #must be greater than or equal to 1%. Any treatment with at least 5% of population will be plotted
+  )
+
+```
+
+
+```{r fig.show="hold", out.width='100%'}
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+#| label: fig-primary-1L
+#| fig-cap: Figure XX Distribution of 1L therapy received by patients stratified by cohort with IPW applied.
+
+
+
+plot_out
+```
+
+
+
+## Debug whyyyy
+
+```{r}
+#| echo: false
+#| eval: false
+
+
+ptData1[,valid_test_date:=pmin(earliest_valid_ResultDate__on_after_time0_PDL1,valid_ResultDate__on_after_time0_NoPDL1,na.rm = T)]
+tmp<-ptData1[cohort=="no_wait" & therapy_group=="Target",.(AdvancedDiagnosisDate,valid_test_date,StartDate)]
+tmp
+#Why are these people receiving target therapy when their valid resul date is prior to?
+tmp[,therapy_to_test:=as.numeric(interval(StartDate,valid_test_date),"days")]
+tmp
+
+bio<-readRDS("../../Data/Enhanced_AdvNSCLCBiomarkers.rds")
+setDT(bio)[, TestType := stringr::str_replace(TestType, "Mass spectrometry", "Mass Spectrometry")]
+setDT(bio)[, TestType := stringr::str_replace(TestType, "Other sequencing method", "Other")]
+
+setDT(bio)[ #combine NTRK's
+  , 
+  BiomarkerName := 
+    stringr::str_replace_all(BiomarkerName, 
+                             c("NTRK1"="NTRK",
+                               "NTRK2"="NTRK",
+                               "NTRK3"="NTRK",
+                               "NTRK - unknown gene type"="NTRK",
+                               "NTRK - other"="NTRK"))
+]
+
+#Define valid test 
+valid_test<-c(
+  "Mutation positive",
+  "PD-L1 positive",
+  "Rearrangement present",
+  "Rearrangement positive",
+  "Amplification positive",
+  "Protein expression positive",
+  "PD-L1 positive",
+  
+  "Mutation negative",
+  "Negative",
+  "PD-L1 negative/not detected",
+  "Rearrangement not present"
+)
+
+```
+
+\
+
+# Secondary analysis
+
+We repeat the primary analysis except with changed inclusion criteria, where the patients have upto 4 weeks after advanced diagnosis date to observe the baseline covariates.
+
+
+
+```{r secondary-analysis}
+#| eval: true
+#| echo: false
+
+ptData2<-
+  merge(ptData2,
+        Albumin$week4[,.(PatientID,TestResultCleaned)],
+        all.x = T)
+setnames(ptData2,"TestResultCleaned","albumin")
+ptData2[,albumin_binary:=ifelse(albumin<=35,"low","normal")]
+ptData2[,albumin_binary:=factor(albumin_binary,levels = c("normal","low"), labels = c("normal","low"))]
+
+ptData2<-
+  merge(ptData2,
+        ECOG$week4[,.(PatientID,EcogValue)],
+        all.x = T)
+setnames(ptData2,"EcogValue","ECOG")
+
+
+ptData2<-
+  merge(ptData2,
+        weight_change$week4[,.(PatientID,first_date_observe_losing_10lbs)],
+        all.x = T)
+ptData2[,lost_10lbs:=0]
+ptData2[!is.na(first_date_observe_losing_10lbs),lost_10lbs:=1]
+ptData2[,first_date_observe_losing_10lbs:=NULL]
+
+#Time 0 is 5th week
+ptData2[,time0:=NULL]
+ptData2[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4)+days(1))]
+
+
+#Now treatment assignment.
+ptData2[,cohort:="wait"]
+ptData2[,time_to_therapy:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
+ptData2[time_to_valid_test_week>time_to_therapy,cohort:="no_wait"]
+ptData2[,cohort:=factor(cohort,levels=c("wait","no_wait"), labels=c("wait","no_wait"))]
+
+
+#generate yearly count of advanced diagnosis date
+ptData2[,AdvancedDiagnosis_year:=year(AdvancedDiagnosisDate)]
+ptData2[,AdvancedDiagnosis_year_factor:=factor(AdvancedDiagnosis_year,levels = sort(unique(AdvancedDiagnosis_year), decreasing = F), labels = sort(unique(AdvancedDiagnosis_year), decreasing = F))]
+
+# ptData2[,min(AdvancedDiagnosis_year)] #2011
+ptData2[,AdvancedDiagnosis_year_rescale:=AdvancedDiagnosis_year-min(AdvancedDiagnosis_year)] #make first one 0.
+
+```
+
+
+\
+
+## Descriptive summary
+
+
+Summary table:
+
+```{r secondary-descriptive-table}
+#| eval: true
+
+
+covars<-list(
+  "albumin_binary" = "Albumin (<= 35 g/L vs. > 35g/L)",
+  "lost_10lbs" = "Lost >= 10lbs",
+  "ECOG"="ECOG",
+  "SmokingStatus"="SmokingStatus",
+  "Histology"="Histology",
+  "Gender"="Gender",
+  "RaceEthnicity"="Race/Ethnicity",
+  "age_at_advDiag"="Approximate age at Advanced Diagnosis",
+  "AdvancedDiagnosis_year_rescale"="Advanced Diagnosis (year)"
+)  
+  secondary_decriptive_table<-
+    tbl_summary(
+      data=ptData2[,.SD,.SDcols=c("cohort",names(covars))],
+      by="cohort",
+      label=covars,
+      missing = "ifany",
+      type = list(where(is.numeric) ~ "continuous2"),  # Use "continuous2" for multiple statistics
+      statistic = list(
+        all_continuous() ~ c("{mean} ({sd})", "{median} ({p25}, {p75})")  # Show both Mean (SD) and Median (Q1, Q3)
+      )
+    )
+
+```
+
+
+
+
+
+```{r}
+#| echo: false
+#| eval: true
+#| warning: false
+#| label: tbl-secondary-dscriptive
+
+
+secondary_decriptive_table |> 
+  as_gt() |> 
+  #  tab_header(
+  #   title = md("What's the difference between this title and caption?"),
+  #   subtitle = md("`gtcars` is an R dataset")
+  # ) |>
+  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline, without IPW weighting.")) |> 
+  as_raw_html() 
+```
+
+
+\
+
+
+
+
+## Inverse probability weight
+
+
+Generate IPW, and re-construct the table.
+
+```{r seocndary-IPW}
+#| eval: true
+#| echo: false
+#| message: false
+
+#Use logistic regression
+covar_cols<-c(
+  "albumin_binary",
+  "lost_10lbs" ,
+  "ECOG",
+  "SmokingStatus",
+  "Histology",
+  "Gender",
+  "RaceEthnicity",
+  "age_at_advDiag",
+  "AdvancedDiagnosis_year_rescale"
+)  
+
+
+this.formula<-formula(paste("cohort~", paste(covar_cols,collapse = "+"), sep=""))
+logit.fit<-glm(this.formula,data=ptData2,family="binomial")
+
+# logit.fit<-glm(cohort~albumin_binary+lost_10lbs+ECOG+SmokingStatus+Histology+Gender+RaceEthnicity+age_at_advDiag+AdvancedDiagnosis_year,data=ptData2,family="binomial")
+
+
+#propensity scores
+ptData2[,ps:=logit.fit$fitted.values]
+
+#generate weight
+ptData2[,w:=ifelse(cohort=="wait",1/ps, 1/(1-ps))]
+
+# #Propensity score plot
+# primary_ps_plot<-ggplot(ptData2, aes(x=ps,fill=cohort))+
+#   geom_density(alpha=0.2)+
+#   theme_minimal()
+# primary_ps_plot
+# 
+# ptData2[cohort=="wait",summary(w)]
+# ptData2[cohort=="no_wait",summary(w)]
+
+
+
+
+#generate stabilized weights, in case there are extreme weights
+prop_no_wait<-mean(ptData2$cohort=="no_wait")
+ptData2[,sw:=ifelse(cohort=="no_wait",prop_no_wait/ps, (1-prop_no_wait)/(1-ps))]
+
+# ptData2[cohort=="wait",summary(sw)]
+# ptData2[cohort=="no_wait",summary(sw)]
+#More balanced weight.
+
+
+
+```
+
+
+
+
+```{r code-secondary-both-tables}
+#| echo: false
+#| eval: true
+#| include: false
+
+
+
+
+#before weight
+library(survey)
+library(tableone)
+
+
+
+before<-svydesign(ids= ~ 0, data=ptData2) 
+before_tab<- svyCreateTableOne(vars=covar_cols, strata = "cohort",data = before, test = FALSE)
+# print(before_tab, smd = TRUE)
+# print(before_tab, showAllLevels = TRUE, smd = TRUE)
+
+
+before_tab_rownames<-rownames(print(before_tab, showAllLevels = TRUE,smd=T))
+before_tab<-as.data.frame(print(before_tab,showAllLevels = TRUE, smd=T))
+before_tab$this.rownames<-before_tab_rownames
+
+
+
+#After weight
+
+
+after<-svydesign(ids= ~ 0, data=ptData2,weights=ptData2$sw)
+after_tab<- svyCreateTableOne(vars=covar_cols, strata = "cohort",data = after, test = FALSE)
+
+after_tab_rownames<-rownames(print(after_tab, showAllLevels = TRUE,smd=T))
+after_tab<-as.data.frame(print(after_tab, showAllLevels = TRUE,smd=T))
+colnames(after_tab)<-paste(colnames(after_tab),"sw",sep = "_")
+
+#merge the two data sets. Can I just bind them?
+# sum(before_tab$this.rownames!=after_tab_rownames) #they are same order. Just cbind them.
+# rownames(before_tab)
+temp<-cbind(before_tab[,c("this.rownames",colnames(before_tab)[colnames(before_tab)!="this.rownames"])],
+            after_tab[,c( "wait_sw","no_wait_sw","SMD_sw")])
+rownames(temp)<-NULL
+
+
+#Change row names to print
+pretty_name<-do.call(c,covars)[covar_cols]
+new_rownames<-
+  sapply(temp$this.rownames,function(x){
+    
+    if(x==""|x=="n"){
+      return(x)
+    }else{
+      
+      #logical for index which name to give
+      this.index.logical<-
+        sapply(names(pretty_name),function(y){
+          stringr::str_detect(string = x,
+                              pattern = y) 
+        })
+      
+      index<-which(this.index.logical)
+      
+      #Replace the raw name with pretty name
+      newname<-
+        stringr::str_replace(string=x, pattern=names(pretty_name)[index], replacement=pretty_name[index])
+      return(newname)
+    }
+    
+  })
+
+temp$this.rownames<-new_rownames
+
+
+```
+
+
+```{r tbl-secondary-dscriptive-both}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| tbl-cap: Summary of Patient Characteristics at Baseline.
+
+
+# build gt table
+gt(temp) |> 
+  # First two columns stay as-is:
+  cols_label(
+    this.rownames = "Variable",
+    level         = "Level",
+    # now override the 6 numeric columns’ *display* labels:
+    wait       = "Wait",
+    no_wait    = "No wait",
+    SMD        = "SMD",
+    wait_sw    = "Wait",
+    no_wait_sw = "No wait",
+    SMD_sw     = "SMD"
+  ) |> 
+  # create the two spanners:
+  tab_spanner(
+    label   = "No IPW",
+    columns = c(wait, no_wait, SMD)
+  ) |> 
+  tab_spanner(
+    label   = "IPW",
+    columns = c(wait_sw, no_wait_sw, SMD_sw)
+  ) |> 
+  # optional styling:
+  opt_align_table_header("left") |> 
+  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline, without IPW weighting.")) |> 
+  as_raw_html()  #this will display the table on
+
+```
+
+
+
+Based on the above table, applying IPW balanced out albumin and advanced diagosis year, which were our concern. Now fit Cox PH model with IPW applied.
+
+\
+
+
+## KM curve
+
+
+
+```{r fig.show="hold", out.width='49%',  fig.height=5}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: fig-secondary-KMplot
+#| fig-cap: Figure XX. Kaplan-Meier (KM curve demonstrating survival probability over time. A) original data, B) IPW applied population. 
+# #| fig-subcap: ["48 patients used for original body compositions", "46 patients used for composite body compositions"]
+# #| layout-ncol: 2
+
+# #| fig-subcap: 
+# #|     - 48 patients used for original body compositions
+# #|     - 46 patients used for composite body compositions
+
+
+#Kaplan meier curve
+#display that works for HTML.
+
+source("../return_km_plot.R")
+
+
+
+
+#generate time variable
+ptData2[,time0_to_death_weeks:=as.numeric(interval(time0,DateOfDeath),"weeks")]
+no_ipw<-return_km_plot(data = ptData2,xlab_name = "Time (week)", time="time0_to_death_weeks",covar = "cohort",status ="DeathInd" ) |> suppressWarnings() #Without suppressWarnings(), I still see warning printed out in html file, even with warning: false.
+
+yes_ipw<-return_km_plot(data = ptData2,xlab_name = "Time (week)", time="time0_to_death_weeks",covar = "cohort",status ="DeathInd" ,weight = T,weight_var = "sw") |> suppressWarnings()
+
+
+#Remove legend
+# Assuming your plot is saved as 'x'
+# and add title
+no_ipw$plot <- no_ipw$plot + theme(legend.position = "none") + ggtitle("A) Without IPW")
+yes_ipw$plot <- yes_ipw$plot + theme(legend.position = "none")+ ggtitle("B) IPW")
+
+
+#subfigure a
+no_ipw
+
+#subfigure b
+yes_ipw
+
+
+
+```
+
+
+```{r secondary-median-surv}
+#| echo: false
+#| eval: true
+
+
+#Just calculate median survival 
+#A function that returns median(95%CI) survival time from surfit() object
+kmplot_median_CI<-function(km_fit, digits=2){
+  #km_fit = survfit() object with binary exposure.
+  
+  temp<-as.data.frame(summary(km_fit)$table)
+  factor_levels<-rownames(temp)
+  
+  this.formula<-paste("%.",digits,"f (95%%CI: %.",digits,"f - %.",digits,"f)", sep="")
+  
+  out<-
+    lapply(factor_levels,function(x){
+      sprintf(this.formula,temp[x,"median"],temp[x,"0.95LCL"],temp[x,"0.95UCL"])
+    })
+  names(out)<-factor_levels
+  out
+}
+
+median_summary_noIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData2), digits=2)
+median_summary_yesIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData2, weights = ptData2$sw), digits=2)
+
+```
+
+
+Without IPW, the median survival of "wait" and "no wait" cohorts are `r median_summary_noIPW$"cohort=wait"`, and `r median_summary_noIPW$"cohort=no_wait"`, respectively. With IPW, however, it changes to `r median_summary_yesIPW$"cohort=wait"`, and `r median_summary_yesIPW$"cohort=no_wait"`, decreasing the difference between the two cohorts.
+
+
+## Effect of 1L before test result become available
+
+```{r secondary-coxph}
+#| echo: false
+#| eval: true
+
+
+#Crude fit 
+source("../coxph.ci.coef.R")
+
+fit1<-coxph(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData2, weights=ptData2$sw, robust = T, x=TRUE)
+summary_fit1<-coxph.ci.coef(fit1,x.name="cohortno_wait",digits=3,return_num_binary_x=FALSE,robust=TRUE)
+
+
+```
+Using the IPW, we fitted a Cox PH model. From this, we conclude that the hazard rate (95% confidence interval) of death by proceeding to 1L before receiving valid test result is `r summary_fit1`. Since the null value 1 is included in the 95% CI, we conclude that proceeding to 1L therapy right away did not produce much difference. 
+
+
+\
+
+
+## 1L therapy distribution
+
+```{r secondary-1L-code}
+#| echo: false
+#| eval: true
+#| include: false
+
+# #Get the most updated classification Wally did for us
+# therapy1<-fread("../../../Data/new_1L/firstLinetherapies.csv")
+# therapy1<-therapy1[,.(L1therapy,CategoryEric1)]
+# colnames(therapy1)<-c("LineName","Group")
+# 
+# therapy2<-readxl::read_xlsx("../../../Data/new_1L/L1therapiesDiscordantclassesWA.xlsx") #This is the one we have to use updated by Wally
+# therapy2<-data.table(therapy2)
+# therapy2<-therapy2[,.(L1therapy,Akerley)]
+# colnames(therapy2)<-c("LineName","Group")
+
+# intersect(therapy2$LineName,therapy1$LineName) #they are mutually exclusive!
+#Bind them
+# therapy<-rbind(therapy1,therapy2)
+#make a vector out of it.
+therapy_vector<-therapy$Group
+names(therapy_vector)<-therapy$LineName
+
+therapy_vector_group<-therapy_vector[ptData2$LineName]
+ptData2[,therapy_group:=therapy_vector_group]
+
+
+
+source("../../EDA_V9/wait_trt_dist_plot_facet.R")
+plot_out<-wait_trt_dist_plot_facet(
+    dat=ptData2,
+    cohort="cohort",
+    geom_text_location_prop=0.7,
+    this.fontsize=3,
+    weight = "sw",
+    trim.percent = 5 #must be greater than or equal to 1%. Any treatment with at least 5% of population will be plotted
+  )
+
+```
+
+
+```{r fig.show="hold", out.width='100%'}
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+#| label: fig-secondary-1L
+#| fig-cap: Figure XX Distribution of 1L therapy received by patients stratified by cohort with IPW applied.
+
+
+
+plot_out
+```
+
+
+
+
