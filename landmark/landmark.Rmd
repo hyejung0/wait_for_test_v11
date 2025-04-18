@@ -22,6 +22,8 @@ output:
   #   number_sections: true 
 # bibliography: references.bib
 # csl: nature.csl
+execute:
+  cache: true
 editor_options: 
   chunk_output_type: console
   markdown: 
@@ -168,17 +170,19 @@ We will subset samples to have:
 ```{r exclusion}
 #| echo: false
 #| eval: true
+#| include: false
 
 
 ptData<-readRDS("../ptData_time0_diag_v2.rds")
-ptData[,time0_to_death_weeks:=as.numeric(interval(time0,DateOfDeath),"weeks")]
-ptData[,time_to_valid_PDL1_week:=as.numeric(interval(time0,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
-ptData[,time_to_valid_gene_week:=as.numeric(interval(time0,valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
-ptData[,time_to_valid_test_week:=pmin(time_to_valid_PDL1_week,time_to_valid_gene_week,na.rm = T)]
+ptData[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
+ptData[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+ptData[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+ptData[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
+ptData[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
 
 
 exclusion_tab<-data.table(
-  "Exclusion"=c("Died/censored before end of week 4","Do not have any record of receiving valid test by the end of week 4"),
+  "Exclusion"=c("Receive 1L therapy before advanced diagnosis date","Receive valid test results before advanced diagnosis date","Died/censored before end of week 4","Do not have any record of receiving valid test by the end of week 4"),
   "Number excluded"=as.numeric(NA),
   "Number remaining"=as.numeric(NA)
 )
@@ -187,29 +191,49 @@ exclusion_tab<-data.table(
 
 #Due to data issue, some people are missing censoring time
 # ptData[DeathInd==0 & time0_to_death_weeks<=0, .N] #442
-pt_exclude<-ptData[DeathInd==0 & time0_to_death_weeks<=0, PatientID]
+pt_exclude<-ptData[DeathInd==0 & advDiag_to_death_weeks<=0, PatientID]
 #We will exclude them 
 ptData<-ptData[!PatientID %in% pt_exclude,]
 num_beginning<-nrow(ptData)
 
 
+#Receive 1L therapy before advanced diagnosis date
+ptData[StartDate<AdvancedDiagnosisDate,.N] #994
+exclude_pt<-ptData[StartDate<AdvancedDiagnosisDate,PatientID] 
+exclusion_tab[Exclusion=="Receive 1L therapy before advanced diagnosis date", `Number excluded`:=length(exclude_pt)]
+exclusion_tab[Exclusion=="Receive 1L therapy before advanced diagnosis date", `Number remaining`:=nrow(ptData)-length(exclude_pt)]
+
+ptData<-ptData[!(PatientID %in% exclude_pt),]
+
+
+
+
+#Receive valid test results before advanced diagnosis date
+ptData[observe_valid__before_time0_PDL1==TRUE | observe_valid__before_time0_NoPDL1==TRUE,.N] #6501
+exclude_pt<-ptData[observe_valid__before_time0_PDL1==TRUE | observe_valid__before_time0_NoPDL1==TRUE,PatientID] 
+
+exclusion_tab[Exclusion=="Receive valid test results before advanced diagnosis date", `Number excluded`:=length(exclude_pt)]
+exclusion_tab[Exclusion=="Receive valid test results before advanced diagnosis date", `Number remaining`:=nrow(ptData)-length(exclude_pt)]
+
+ptData<-ptData[!(PatientID %in% exclude_pt),]
+
 
 
 
 #survived up to 4 weeks 
-exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number excluded`:=ptData[time0_to_death_weeks<=4,.N]]
-exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number remaining`:=ptData[time0_to_death_weeks>4,.N]]
+exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number excluded`:=ptData[advDiag_to_death_weeks<=4,.N]]
+exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number remaining`:=ptData[advDiag_to_death_weeks>4,.N]]
 
-ptData<-ptData[time0_to_death_weeks>4,]
+ptData<-ptData[advDiag_to_death_weeks>4,]
 
 
 
 #Receive valid test result prior to the end of 4th week
-exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number excluded`:=ptData[time_to_valid_test_week>4 | is.na(time_to_valid_test_week),.N]]
-exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number remaining`:=ptData[time_to_valid_test_week<=4,.N]]
+exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number excluded`:=ptData[advDiag_to_valid_test_week>4 | is.na(advDiag_to_valid_test_week),.N]]
+exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number remaining`:=ptData[advDiag_to_valid_test_week<=4,.N]]
 
 
-ptData<-ptData[time_to_valid_test_week<=4]
+ptData<-ptData[advDiag_to_valid_test_week<=4]
 
 ```
 
@@ -233,18 +257,34 @@ kable(exclusion_tab)
 ```{r exclusion-primary}
 #| echo: false
 #| eval: true
+#| include: false
 
 
-#Only include people who have observed all variables
+#Only include people who have observed all variables (including time depedent and indenpendent variables)
 ptData1<-copy(ptData)
+nrow(ptData1) #27706
 exclusion_tab1<-copy(exclusion_tab)
 
+
+#time-dependent covariate
 ptData1<-ptData1[PatientID %in% Albumin$week1[observe_lab_within_window==1,PatientID],]
-
-
 ptData1<-ptData1[PatientID %in% ECOG$week1[observe_lab_within_window==1,PatientID],]
-
 ptData1<-ptData1[PatientID %in% weight_change$week1[observe_at_least_two_weight==TRUE,PatientID],]
+nrow(ptData1) #3018
+
+#time-independent covariate
+ptData1[,table(SmokingStatus, useNA = "ifany")] #two unknown not documented. Meaning, not observed.
+ptData1[SmokingStatus=="Unknown/Not documented", .(advDiag_to_valid_test_week, advDiag_to_1L_week)] #One in each cohort. Remove them 
+ptData1<-ptData1[SmokingStatus!="Unknown/Not documented",]
+
+
+ptData1[,table(Histology, useNA = "ifany")] 
+ptData1[,table(Gender, useNA = "ifany")]
+ptData1[,table(RaceEthnicity, useNA = "ifany")] 
+ptData1[,sum(is.na(age_at_advDiag))]
+ptData1[,sum(is.na(AdvancedDiagnosisDate))]
+
+
 
 exclusion_tab1<-
 rbind(
@@ -281,18 +321,38 @@ kable(exclusion_tab1)
 ```{r exclusion-secondary}
 #| echo: false
 #| eval: true
+#| include: false
 
 
-#Only include people who have observed all variables
+#Only include people who have observed all variables (including time depedent and indenpendent variables)
 ptData2<-copy(ptData)
+nrow(ptData2) #27706
 exclusion_tab2<-copy(exclusion_tab)
 
+
+#time-dependent covariate
 ptData2<-ptData2[PatientID %in% Albumin$week4[observe_lab_within_window==1,PatientID],]
-
-
 ptData2<-ptData2[PatientID %in% ECOG$week4[observe_lab_within_window==1,PatientID],]
-
 ptData2<-ptData2[PatientID %in% weight_change$week4[observe_at_least_two_weight==TRUE,PatientID],]
+nrow(ptData2) #11317
+
+#time-independent covariate
+ptData2[,table(SmokingStatus, useNA = "ifany")] #8 unknown not documented. Meaning, not observed.
+tmp<-ptData2[SmokingStatus=="Unknown/Not documented", .(advDiag_to_valid_test_week, advDiag_to_1L_week)] 
+tmp[is.na(advDiag_to_1L_week),advDiag_to_1L_week:=1000]
+tmp[,cohort:="wait"]
+tmp[advDiag_to_1L_week<advDiag_to_valid_test_week,cohort:="no_wait"]
+tmp
+#Among the 8 people with missing Smoking status, 5 people are wait, and 3 are no wait. 
+#Exclude them.
+ptData2<-ptData2[SmokingStatus!="Unknown/Not documented",]
+
+ptData2[,table(Histology, useNA = "ifany")] 
+ptData2[,table(Gender, useNA = "ifany")]
+ptData2[,table(RaceEthnicity, useNA = "ifany")] 
+ptData2[,sum(is.na(age_at_advDiag))]
+ptData2[,sum(is.na(AdvancedDiagnosisDate))]
+
 
 exclusion_tab2<-
 rbind(
@@ -346,8 +406,9 @@ ptData1<-
 merge(ptData1,
       weight_change$week1[,.(PatientID,first_date_observe_losing_10lbs)],
       all.x = T)
-ptData1[,lost_10lbs:=0]
-ptData1[!is.na(first_date_observe_losing_10lbs),lost_10lbs:=1]
+ptData1[,lost_10lbs:="No"]
+ptData1[!is.na(first_date_observe_losing_10lbs),lost_10lbs:="Yes"]
+ptData1[,lost_10lbs:=factor(lost_10lbs,levels=c("No","Yes"), labels=c("No","Yes"))]
 ptData1[,first_date_observe_losing_10lbs:=NULL]
 
 #Time 0 is 5th week
@@ -357,8 +418,7 @@ ptData1[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4)+days(1))]
 
 #Now treatment assignment.
 ptData1[,cohort:="wait"]
-ptData1[,time_to_therapy:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
-ptData1[time_to_valid_test_week>time_to_therapy,cohort:="no_wait"]
+ptData1[advDiag_to_1L_week<advDiag_to_valid_test_week,cohort:="no_wait"]
 ptData1[,cohort:=factor(cohort,levels=c("wait","no_wait"), labels=c("wait","no_wait"))]
 
 
@@ -428,20 +488,16 @@ primary_decriptive_table |>
 ```
 
 
-As we can observe in the table, there are only two people who are Hispanic/Latino and they are all in the cohort that did not wait for the test result prior to receiving 1L therapy. That is, there is violation of positivity assumption for causal inference with these two patients included in the analysis. In terms of propensity scores, these patients will have propensity score of 1 for not waiting for test result. Therefore, We will further exclude these patients for our primary analysis. 
+As we can observe in the table, there is only one person who is Hispanic/Latino in no wait cohort. This is insufficient data to make any meaningful analysis. Thus, we will fuse Hispanic Lanito to Other category. 
 
 ```{r primary-exclude-pt-for-positivity}
 #| echo: false
-#| eval: false
+#| eval: true
 
 
-#Only two patients with HispLatino RaceEthnicity
-#And they are both no wait cohort
-#Must be excluded for
-#Positivity assumption
+#Make HispLatino -> Other 
 
-exclude_pt<-ptData1[RaceEthnicity=="HispLatino",PatientID]
-ptData1<-ptData1[!PatientID %in% exclude_pt,]
+ptData1[RaceEthnicity=="HispLatino",RaceEthnicity:="Other"]
 ```
 
 
@@ -456,6 +512,7 @@ Generate IPW, and re-construct the table.
 #| eval: true
 #| echo: false
 #| message: false
+#| include: false
 
 #Use logistic regression
 covar_cols<-c(
@@ -483,15 +540,20 @@ ptData1[,ps:=logit.fit$fitted.values]
 #generate weight
 ptData1[,w:=ifelse(cohort=="wait",1/ps, 1/(1-ps))]
 
-# #Propensity score plot
-# primary_ps_plot<-ggplot(ptData1, aes(x=ps,fill=cohort))+
-#   geom_density(alpha=0.2)+
-#   theme_minimal()
-# primary_ps_plot
-# 
-# ptData1[cohort=="wait",summary(w)]
-# ptData1[cohort=="no_wait",summary(w)]
+#Propensity score plot for positivity assumption
+primary_ps_plot<-ggplot(ptData1, aes(x=ps,fill=cohort))+
+  geom_density(alpha=0.2)+
+  theme_minimal()
+primary_ps_plot #seem like there is a good overlap... Maybe.
+#Check the summary of ps by cohort
+ptData1[cohort=="wait",summary(ps)]
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.05696 0.11658 0.14626 0.15414 0.18184 0.40228
+ptData1[cohort=="no_wait",summary(ps)]
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.05529 0.13284 0.16594 0.17544 0.21220 0.39429 
 
+#Yes. I thin there are pretty good overlap.
 
 
 
@@ -499,9 +561,11 @@ ptData1[,w:=ifelse(cohort=="wait",1/ps, 1/(1-ps))]
 prop_no_wait<-mean(ptData1$cohort=="no_wait")
 ptData1[,sw:=ifelse(cohort=="no_wait",prop_no_wait/ps, (1-prop_no_wait)/(1-ps))]
 
-# ptData1[cohort=="wait",summary(sw)]
-# ptData1[cohort=="no_wait",summary(sw)]
-#More balanced weight.
+#Check extreme weight
+ptData1[cohort=="wait",summary(sw)]
+ptData1[cohort=="no_wait",summary(sw)]
+#all weights under 3. Good!
+
 
 
 
@@ -626,7 +690,7 @@ gt(temp) |>
 
 
 
-Based on the above table, applying IPW balanced out albumin, race, and age, which were our concern. Now fit Cox PH model with IPW applied.
+Based on the above table, we can observe that when we don't apply IPW, the standardized mean difference (SMD) for albumin, race/ethnicity, age at diagnosis, and advanced diagnosis (year) were imbalanced (SMD > 0.1). However, after IPW, these covariates are all balanced (SMD < 0.1). 
 
 \
 
@@ -668,12 +732,17 @@ yes_ipw<-return_km_plot(data = ptData1,xlab_name = "Time (week)", time="time0_to
 #Remove legend
 # Assuming your plot is saved as 'x'
 # and add title
-no_ipw$plot <- no_ipw$plot + theme(legend.position = "none") + ggtitle("A) Without IPW")
-yes_ipw$plot <- yes_ipw$plot + theme(legend.position = "none")+ ggtitle("B) IPW")
+no_ipw$plot <- no_ipw$plot + 
+  # theme(legend.position = "none") + 
+  ggtitle("A) Without IPW")
+yes_ipw$plot <- yes_ipw$plot + 
+  # theme(legend.position = "none")+ 
+  ggtitle("B) IPW")
 
 
 #subfigure a
 no_ipw
+  
 
 #subfigure b
 yes_ipw
@@ -712,7 +781,7 @@ median_summary_yesIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathI
 ```
 
 
-Without IPW, the median survival of "wait" and "no wait" cohorts are `r median_summary_noIPW$"cohort=wait"`, and `r median_summary_noIPW$"cohort=no_wait"`, respectively. With IPW, however, it changes to `r median_summary_yesIPW$"cohort=wait"`, and `r median_summary_yesIPW$"cohort=no_wait"`, showing a little bit of decrease for "wait" cohort and a bit of increase for "no wait" cohort.
+Without IPW, the median survival of "wait" and "no wait" cohorts were `r median_summary_noIPW$"cohort=wait"`, and `r median_summary_noIPW$"cohort=no_wait"`, respectively. With IPW, however, the median survival decreased very slightly for the wait cohort  (`r median_summary_yesIPW$"cohort=wait"`), while the median survival of those who waited increased much (`r median_summary_yesIPW$"cohort=no_wait"`). Even though the confidence interval substantially overlap.
 
 
 ## Effect of 1L before test result become available
@@ -727,7 +796,7 @@ source("../coxph.ci.coef.R")
 
 fit1<-coxph(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData1, weights=ptData1$sw, robust = T, x=TRUE)
 summary_fit1<-coxph.ci.coef(fit1,x.name="cohortno_wait",digits=3,return_num_binary_x=FALSE,robust=TRUE)
-
+summary_fit1<-summary_fit1["HR(95%CI)"]
 
 ```
 Using the IPW, we fitted a Cox PH model. From this, we conclude that the hazard rate (95% confidence interval) of death by proceeding to 1L before receiving valid test result is `r summary_fit1`. Since the null value 1 is included in the 95% CI, we conclude that proceeding to 1L therapy right away did not produce much difference. 
@@ -742,36 +811,55 @@ Using the IPW, we fitted a Cox PH model. From this, we conclude that the hazard 
 #| eval: true
 #| include: false
 
-#Get the most updated classification Wally did for us
-therapy1<-fread("../../../Data/new_1L/firstLinetherapies.csv")
-therapy1<-therapy1[,.(L1therapy,CategoryEric1)]
-colnames(therapy1)<-c("LineName","Group")
 
-therapy2<-readxl::read_xlsx("../../../Data/new_1L/L1therapiesDiscordantclassesWA.xlsx") #This is the one we have to use updated by Wally
-therapy2<-data.table(therapy2)
-therapy2<-therapy2[,.(L1therapy,Akerley)]
-colnames(therapy2)<-c("LineName","Group")
+# ptData1$FirstLineTherapyGroup
+# #Get the most updated classification Wally did for us
+# therapy1<-fread("../../../Data/new_1L/firstLinetherapies.csv")
+# therapy1<-therapy1[,.(L1therapy,CategoryEric1)]
+# colnames(therapy1)<-c("LineName","Group")
+# 
+# therapy2<-readxl::read_xlsx("../../../Data/new_1L/L1therapiesDiscordantclassesWA.xlsx") #This is the one we have to use updated by Wally
+# therapy2<-data.table(therapy2)
+# therapy2<-therapy2[,.(L1therapy,Akerley)]
+# colnames(therapy2)<-c("LineName","Group")
+# 
+# # intersect(therapy2$LineName,therapy1$LineName) #they are mutually exclusive!
+# #Bind them
+# therapy<-rbind(therapy1,therapy2)
+# #make a vector out of it.
+# therapy_vector<-therapy$Group
+# names(therapy_vector)<-therapy$LineName
+# 
+# therapy_vector_group<-therapy_vector[ptData1$LineName]
+# ptData1[,therapy_group:=therapy_vector_group]
 
-# intersect(therapy2$LineName,therapy1$LineName) #they are mutually exclusive!
-#Bind them
-therapy<-rbind(therapy1,therapy2)
-#make a vector out of it.
-therapy_vector<-therapy$Group
-names(therapy_vector)<-therapy$LineName
-
-therapy_vector_group<-therapy_vector[ptData1$LineName]
-ptData1[,therapy_group:=therapy_vector_group]
 
 
+
+#Make sure everything is categorized
+table(ptData1$FirstLineTherapyGroup, useNA = "ifany") #294 NAs
+# Use my old data
+#see if there are any that were not observed in the new grouping
+my.dictionary<-readRDS("../../EDA_V9/1Lgroup_dictionary_new_all.rds")
+table(!(my.dictionary$FirstLineTherapy %in% ptData1$LineName)) #There are lots not in there.
+
+#Let's switch
+ptData1[,FirstLineTherapyGroup_old_and_new:=FirstLineTherapyGroup]
+this_group<-my.dictionary[,final]
+names(this_group)<-my.dictionary$FirstLineTherapy
+ptData1[is.na(FirstLineTherapyGroup),FirstLineTherapyGroup_old_and_new:=this_group[LineName]]
+#Make sure verything is categorized
+table(ptData1$FirstLineTherapyGroup_old_and_new, useNA = "ifany") #Lots of NA
 
 source("../../EDA_V9/wait_trt_dist_plot_facet.R")
 plot_out<-wait_trt_dist_plot_facet(
-    dat=ptData1,
+    dat=ptData1[,.(cohort,FirstLineTherapyGroup_old_and_new,sw)],
     cohort="cohort",
     geom_text_location_prop=0.7,
     this.fontsize=3,
     weight = "sw",
-    trim.percent = 5 #must be greater than or equal to 1%. Any treatment with at least 5% of population will be plotted
+    trim.percent = 5, #must be greater than or equal to 1%. Any treatment with at least 5% of population will be plotted
+    therapy_col = "FirstLineTherapyGroup_old_and_new"
   )
 
 ```
@@ -783,61 +871,16 @@ plot_out<-wait_trt_dist_plot_facet(
 #| message: false
 #| warning: false
 #| label: fig-primary-1L
-#| fig-cap: Figure XX Distribution of 1L therapy received by patients stratified by cohort with IPW applied.
+#| fig-cap: Figure XX Distribution of 1L therapy received by patients stratified by cohort with IPW applied. Only the treatments that compose more than 5% of either of the two cohorts is shown in the plot.
 
 
 
 plot_out
 ```
 
+For those who waited for the valid test result, most people received chemotherapy, followed by chemoimmunotherapy, and immunotherapy alone. And surprisingly, many didn't receive any therapy. The 5th most observed therapy was target therapy.
 
-
-## Debug whyyyy
-
-```{r}
-#| echo: false
-#| eval: false
-
-
-ptData1[,valid_test_date:=pmin(earliest_valid_ResultDate__on_after_time0_PDL1,valid_ResultDate__on_after_time0_NoPDL1,na.rm = T)]
-tmp<-ptData1[cohort=="no_wait" & therapy_group=="Target",.(AdvancedDiagnosisDate,valid_test_date,StartDate)]
-tmp
-#Why are these people receiving target therapy when their valid resul date is prior to?
-tmp[,therapy_to_test:=as.numeric(interval(StartDate,valid_test_date),"days")]
-tmp
-
-bio<-readRDS("../../Data/Enhanced_AdvNSCLCBiomarkers.rds")
-setDT(bio)[, TestType := stringr::str_replace(TestType, "Mass spectrometry", "Mass Spectrometry")]
-setDT(bio)[, TestType := stringr::str_replace(TestType, "Other sequencing method", "Other")]
-
-setDT(bio)[ #combine NTRK's
-  , 
-  BiomarkerName := 
-    stringr::str_replace_all(BiomarkerName, 
-                             c("NTRK1"="NTRK",
-                               "NTRK2"="NTRK",
-                               "NTRK3"="NTRK",
-                               "NTRK - unknown gene type"="NTRK",
-                               "NTRK - other"="NTRK"))
-]
-
-#Define valid test 
-valid_test<-c(
-  "Mutation positive",
-  "PD-L1 positive",
-  "Rearrangement present",
-  "Rearrangement positive",
-  "Amplification positive",
-  "Protein expression positive",
-  "PD-L1 positive",
-  
-  "Mutation negative",
-  "Negative",
-  "PD-L1 negative/not detected",
-  "Rearrangement not present"
-)
-
-```
+For those who proceeded to 1L therapy without waiting for valid test result, chemotherapy was the most common, followed by chemoimmunotherapy, and immunotherapy. 
 
 \
 
@@ -870,8 +913,9 @@ ptData2<-
   merge(ptData2,
         weight_change$week4[,.(PatientID,first_date_observe_losing_10lbs)],
         all.x = T)
-ptData2[,lost_10lbs:=0]
-ptData2[!is.na(first_date_observe_losing_10lbs),lost_10lbs:=1]
+ptData2[,lost_10lbs:="No"]
+ptData2[!is.na(first_date_observe_losing_10lbs),lost_10lbs:="Yes"]
+ptData2[,lost_10lbs:=factor(lost_10lbs,levels=c("No","Yes"), labels=c("No","Yes"))]
 ptData2[,first_date_observe_losing_10lbs:=NULL]
 
 #Time 0 is 5th week
@@ -881,9 +925,9 @@ ptData2[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4)+days(1))]
 
 #Now treatment assignment.
 ptData2[,cohort:="wait"]
-ptData2[,time_to_therapy:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
-ptData2[time_to_valid_test_week>time_to_therapy,cohort:="no_wait"]
+ptData2[advDiag_to_1L_week<advDiag_to_valid_test_week,cohort:="no_wait"]
 ptData2[,cohort:=factor(cohort,levels=c("wait","no_wait"), labels=c("wait","no_wait"))]
+
 
 
 #generate yearly count of advanced diagnosis date
@@ -954,6 +998,22 @@ secondary_decriptive_table |>
 ```
 
 
+As in the case if the primary analysis, there are hardly any hispanic/latino. They are fused with Other category.
+
+
+
+```{r secondary-exclude-pt-for-positivity}
+#| echo: false
+#| eval: true
+
+
+#Make HispLatino -> Other 
+
+ptData2[RaceEthnicity=="HispLatino",RaceEthnicity:="Other"]
+```
+
+
+
 \
 
 
@@ -968,6 +1028,7 @@ Generate IPW, and re-construct the table.
 #| eval: true
 #| echo: false
 #| message: false
+#| include: false
 
 #Use logistic regression
 covar_cols<-c(
@@ -995,15 +1056,19 @@ ptData2[,ps:=logit.fit$fitted.values]
 #generate weight
 ptData2[,w:=ifelse(cohort=="wait",1/ps, 1/(1-ps))]
 
-# #Propensity score plot
-# primary_ps_plot<-ggplot(ptData2, aes(x=ps,fill=cohort))+
+#Propensity score plot
+# secondary_ps_plot<-ggplot(ptData2, aes(x=ps,fill=cohort))+
 #   geom_density(alpha=0.2)+
 #   theme_minimal()
-# primary_ps_plot
-# 
-# ptData2[cohort=="wait",summary(w)]
-# ptData2[cohort=="no_wait",summary(w)]
-
+# secondary_ps_plot #seem like there is a good overlap... Maybe.
+#Check the summary of ps by cohort
+ptData2[cohort=="wait",summary(ps)]
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.03386 0.09165 0.11496 0.12160 0.14436 0.32224 
+ptData2[cohort=="no_wait",summary(ps)]
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.04707 0.10471 0.12927 0.13776 0.16543 0.38700
+#Really good overlap.
 
 
 
@@ -1011,9 +1076,10 @@ ptData2[,w:=ifelse(cohort=="wait",1/ps, 1/(1-ps))]
 prop_no_wait<-mean(ptData2$cohort=="no_wait")
 ptData2[,sw:=ifelse(cohort=="no_wait",prop_no_wait/ps, (1-prop_no_wait)/(1-ps))]
 
-# ptData2[cohort=="wait",summary(sw)]
-# ptData2[cohort=="no_wait",summary(sw)]
-#More balanced weight.
+#Check extreme weights
+ptData2[cohort=="wait",summary(sw)]
+ptData2[cohort=="no_wait",summary(sw)]
+#Good. No weights exceeding 3.
 
 
 
@@ -1137,8 +1203,8 @@ gt(temp) |>
 ```
 
 
+Without IPW, albumin and diagnosis year are are imbalanced. However, IPW balanced them out.
 
-Based on the above table, applying IPW balanced out albumin and advanced diagosis year, which were our concern. Now fit Cox PH model with IPW applied.
 
 \
 
@@ -1165,9 +1231,6 @@ Based on the above table, applying IPW balanced out albumin and advanced diagosi
 #Kaplan meier curve
 #display that works for HTML.
 
-source("../return_km_plot.R")
-
-
 
 
 #generate time variable
@@ -1180,8 +1243,12 @@ yes_ipw<-return_km_plot(data = ptData2,xlab_name = "Time (week)", time="time0_to
 #Remove legend
 # Assuming your plot is saved as 'x'
 # and add title
-no_ipw$plot <- no_ipw$plot + theme(legend.position = "none") + ggtitle("A) Without IPW")
-yes_ipw$plot <- yes_ipw$plot + theme(legend.position = "none")+ ggtitle("B) IPW")
+no_ipw$plot <- no_ipw$plot + 
+  # theme(legend.position = "none") + 
+  ggtitle("A) Without IPW")
+yes_ipw$plot <- yes_ipw$plot + 
+  # theme(legend.position = "none")+ 
+  ggtitle("B) IPW")
 
 
 #subfigure a
@@ -1201,22 +1268,6 @@ yes_ipw
 
 
 #Just calculate median survival 
-#A function that returns median(95%CI) survival time from surfit() object
-kmplot_median_CI<-function(km_fit, digits=2){
-  #km_fit = survfit() object with binary exposure.
-  
-  temp<-as.data.frame(summary(km_fit)$table)
-  factor_levels<-rownames(temp)
-  
-  this.formula<-paste("%.",digits,"f (95%%CI: %.",digits,"f - %.",digits,"f)", sep="")
-  
-  out<-
-    lapply(factor_levels,function(x){
-      sprintf(this.formula,temp[x,"median"],temp[x,"0.95LCL"],temp[x,"0.95UCL"])
-    })
-  names(out)<-factor_levels
-  out
-}
 
 median_summary_noIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData2), digits=2)
 median_summary_yesIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData2, weights = ptData2$sw), digits=2)
@@ -1224,7 +1275,7 @@ median_summary_yesIPW<-kmplot_median_CI(survfit(Surv(time0_to_death_weeks,DeathI
 ```
 
 
-Without IPW, the median survival of "wait" and "no wait" cohorts are `r median_summary_noIPW$"cohort=wait"`, and `r median_summary_noIPW$"cohort=no_wait"`, respectively. With IPW, however, it changes to `r median_summary_yesIPW$"cohort=wait"`, and `r median_summary_yesIPW$"cohort=no_wait"`, decreasing the difference between the two cohorts.
+Without IPW, the median survival of "wait" and "no wait" cohorts were `r median_summary_noIPW$"cohort=wait"`, and `r median_summary_noIPW$"cohort=no_wait"`, respectively. Patients who waited lived substantially longer.With IPW, however, the median survival decreased slightly in wait cohort (`r median_summary_yesIPW$"cohort=wait"`), and increased quite a bit in no wait cohort (`r median_summary_yesIPW$"cohort=no_wait"`). Therefore, the difference in the median survival between the two cohorts is attenuated with IPW.
 
 
 ## Effect of 1L before test result become available
@@ -1235,14 +1286,14 @@ Without IPW, the median survival of "wait" and "no wait" cohorts are `r median_s
 
 
 #Crude fit 
-source("../coxph.ci.coef.R")
 
-fit1<-coxph(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData2, weights=ptData2$sw, robust = T, x=TRUE)
-summary_fit1<-coxph.ci.coef(fit1,x.name="cohortno_wait",digits=3,return_num_binary_x=FALSE,robust=TRUE)
-
+fit2<-coxph(Surv(time0_to_death_weeks,DeathInd)~cohort, data = ptData2, weights=ptData2$sw, robust = T, x=TRUE)
+summary_fit2<-coxph.ci.coef(fit1,x.name="cohortno_wait",digits=3,return_num_binary_x=FALSE,robust=TRUE)
+summary_fit2<-summary_fit2["HR(95%CI)"]
 
 ```
-Using the IPW, we fitted a Cox PH model. From this, we conclude that the hazard rate (95% confidence interval) of death by proceeding to 1L before receiving valid test result is `r summary_fit1`. Since the null value 1 is included in the 95% CI, we conclude that proceeding to 1L therapy right away did not produce much difference. 
+
+Using the IPW, we fitted a Cox PH model. From this, we conclude that the hazard rate (95% confidence interval) of death by proceeding to 1L before receiving valid test result is `r summary_fit2`. Since the null value 1 is included in the 95% CI, we conclude that proceeding to 1L therapy right away did not produce much difference. 
 
 
 \
@@ -1255,36 +1306,32 @@ Using the IPW, we fitted a Cox PH model. From this, we conclude that the hazard 
 #| eval: true
 #| include: false
 
-# #Get the most updated classification Wally did for us
-# therapy1<-fread("../../../Data/new_1L/firstLinetherapies.csv")
-# therapy1<-therapy1[,.(L1therapy,CategoryEric1)]
-# colnames(therapy1)<-c("LineName","Group")
-# 
-# therapy2<-readxl::read_xlsx("../../../Data/new_1L/L1therapiesDiscordantclassesWA.xlsx") #This is the one we have to use updated by Wally
-# therapy2<-data.table(therapy2)
-# therapy2<-therapy2[,.(L1therapy,Akerley)]
-# colnames(therapy2)<-c("LineName","Group")
-
-# intersect(therapy2$LineName,therapy1$LineName) #they are mutually exclusive!
-#Bind them
-# therapy<-rbind(therapy1,therapy2)
-#make a vector out of it.
-therapy_vector<-therapy$Group
-names(therapy_vector)<-therapy$LineName
-
-therapy_vector_group<-therapy_vector[ptData2$LineName]
-ptData2[,therapy_group:=therapy_vector_group]
+#Get the most updated classification Wally did for us
 
 
+#Make sure everything is categorized
+table(ptData2$FirstLineTherapyGroup, useNA = "ifany") #1063 NAs
+# Use my old data
+#see if there are any that were not observed in the new grouping
+my.dictionary<-readRDS("../../EDA_V9/1Lgroup_dictionary_new_all.rds")
 
-source("../../EDA_V9/wait_trt_dist_plot_facet.R")
+#Let's switch
+ptData2[,FirstLineTherapyGroup_old_and_new:=FirstLineTherapyGroup]
+this_group<-my.dictionary[,final]
+names(this_group)<-my.dictionary$FirstLineTherapy
+ptData2[is.na(FirstLineTherapyGroup),FirstLineTherapyGroup_old_and_new:=this_group[LineName]]
+#Make sure verything is categorized
+table(ptData2$FirstLineTherapyGroup_old_and_new, useNA = "ifany") #Lots of NA
+
+
 plot_out<-wait_trt_dist_plot_facet(
-    dat=ptData2,
+    dat=ptData2[,.(cohort,FirstLineTherapyGroup_old_and_new,sw)],
     cohort="cohort",
     geom_text_location_prop=0.7,
     this.fontsize=3,
     weight = "sw",
-    trim.percent = 5 #must be greater than or equal to 1%. Any treatment with at least 5% of population will be plotted
+    trim.percent = 5, #must be greater than or equal to 1%. Any treatment with at least 5% of population will be plotted
+    therapy_col = "FirstLineTherapyGroup_old_and_new"
   )
 
 ```
@@ -1296,13 +1343,483 @@ plot_out<-wait_trt_dist_plot_facet(
 #| message: false
 #| warning: false
 #| label: fig-secondary-1L
-#| fig-cap: Figure XX Distribution of 1L therapy received by patients stratified by cohort with IPW applied.
+#| fig-cap: Figure XX Distribution of 1L therapy received by patients stratified by cohort with IPW applied. Only the treatments that compose more than 5% of either of the two cohorts is shown in the plot.
 
 
 
 plot_out
 ```
 
+For those who waited for the valid test result, the 1L therapy distribution is similar to primary analysis, except that more target therapy was observed than no therapy.
+
+For those who proceeded to 1L therapy without waiting for valid test result, similar result was observed as in the primary analysis, but now we have a few patients who seem to have received target therapy. This is due to the fact that chemotherapy was the most common, followed by chemoimmunotherapy, no therapy.
 
 
+```{r secondary-target-investigate}
+#| eval: false
+#| echo: false
+
+
+#Investigate what's going on
+ptData2[cohort=="no_wait" & therapy_group=="Target",.N] #44 people 
+ptData2[,valid_test_date:=pmin(valid_ResultDate__on_after_time0_NoPDL1,earliest_valid_ResultDate__on_after_time0_PDL1,na.rm = T)]
+
+tmp<-ptData2[cohort=="no_wait" & therapy_group=="Target",.(PatientID,AdvancedDiagnosisDate,valid_test_date, StartDate)]
+
+investigate_pt<-tmp[,PatientID]
+for(pt in investigate_pt){
+  print(
+    tmp[PatientID==pt,]
+  )
+  
+  bio_supset<-bio[PatientID==pt,]
+  setkeyv(bio_supset,cols=c("SpecimenCollectedDate","SpecimenReceivedDate","ResultDate"))
+  
+  #Just show the ones missing result date or result is <= 1L date
+  therapy_date<-ptData1[PatientID==pt,StartDate]
+  bio_supset<-bio_supset[ResultDate<=therapy_date | is.na(ResultDate),]
+  
+  
+  print(
+    bio_supset[,.(PatientID,BiomarkerName,CellType, SpecimenCollectedDate, SpecimenReceivedDate, ResultDate,                   BiomarkerStatus,PercentStaining)]
+  )
+  readline("[enter]:")
+}
+
+
+
+#F05CF759A3240
+#F61A0D82CC540 <- this patient received ALK positive therapy. It's result came out 7 days after 1L initation date. So I think the result date is wrong lol
+#All other people are not present in the biomarker dataset or missing result Date
+pt<-"F05CF759A3240"
+
+bio_supset<-bio[PatientID==pt,]
+setkeyv(bio_supset,cols=c("SpecimenCollectedDate","SpecimenReceivedDate","ResultDate"))
+therapy_date<-ptData1[PatientID==pt,StartDate]
+bio_supset<-bio_supset[ResultDate<=therapy_date | is.na(ResultDate),]
+
+ptData[PatientID==pt, .(observe_valid__before_time0_NoPDL1,observe_valid__before_time0_PDL1) ]
+#   observe_valid__before_time0_NoPDL1 observe_valid__before_time0_PDL1
+#                               <lgcl>                           <lgcl>
+#1:                              FALSE                            FALSE
+
+tmp[PatientID==pt,]
+#       PatientID AdvancedDiagnosisDate valid_test_date  StartDate
+#          <char>                <IDat>          <IDat>     <IDat>
+#1: F05CF759A3240            2020-06-23      2020-07-03 2020-06-26
+
+bio_supset[,.(PatientID,BiomarkerName,CellType, SpecimenCollectedDate, SpecimenReceivedDate, ResultDate,                   BiomarkerStatus,PercentStaining)]
+#       PatientID BiomarkerName CellType SpecimenCollectedDate SpecimenReceivedDate ResultDate           BiomarkerStatus PercentStaining
+#          <char>        <char>   <char>                <IDat>               <IDat>     <IDat>                    <char>          <char>
+#1: F05CF759A3240          EGFR                     2018-04-25           2018-05-09 2018-05-14         Mutation negative                
+#2: F05CF759A3240           ALK                     2018-04-25           2018-05-09 2018-05-15     Rearrangement present                
+#3: F05CF759A3240          ROS1                     2018-04-25           2018-05-09 2018-05-15 Rearrangement not present                
+
+```
+
+\
+
+# Subgroup analysis
+
+Wally suggested that I do this for subgroups
+
+- ECOG 0-2 
+- ECOG 3-4 
+- Albumin $\leq 35$ 
+- Albumin $> 35$ g/L 
+- Asian
+- Female
+- Male
+- No history of smoking 
+- History of smoking
+
+```{r subgroup-primary-code}
+#| eval: true
+#| include: false
+
+primary_subgroups<-list(
+  "All"=ptData1,
+  "ECOG (0-2)"=ptData1[ECOG<3,][,ECOG:=NULL],
+  "ECOG (3-4)"=ptData1[ECOG>=3,][,ECOG:=NULL],
+  "Albumin (low)"=ptData1[albumin_binary=="low", ][,albumin_binary:=NULL],
+  "Albumin (normal)"=ptData1[albumin_binary=="normal", ][,albumin_binary:=NULL],
+  "Asian"=ptData1[RaceEthnicity=="AsianNonHisp", ][,RaceEthnicity:=NULL],
+  "Female"=ptData1[Gender=="F",][,Gender:=NULL],
+  "Male"=ptData1[Gender=="M",][,Gender:=NULL],
+  "Smoked"=ptData1[SmokingStatus=="History of smoking",][,SmokingStatus:=NULL],
+  "Never Smoked"=ptData1[SmokingStatus=="No history of smoking",][,SmokingStatus:=NULL]
+)
+
+
+
+source("../whole_analysis_func.R")
+
+subgroup_analyses_primary<-lapply(primary_subgroups,whole_analysis_func)
+```
+
+
+
+
+```{r subgroup-secondary-code}
+#| eval: true
+#| include: false
+
+secondary_subgroups<-list(
+  "All"=ptData2,
+  "ECOG (0-2)"=ptData2[ECOG<3,][,ECOG:=NULL],
+  "ECOG (3-4)"=ptData2[ECOG>=3,][,ECOG:=NULL],
+  "Albumin (low)"=ptData2[albumin_binary=="low", ][,albumin_binary:=NULL],
+  "Albumin (normal)"=ptData2[albumin_binary=="normal", ][,albumin_binary:=NULL],
+  "Asian"=ptData2[RaceEthnicity=="AsianNonHisp", ][,RaceEthnicity:=NULL],
+  "Female"=ptData2[Gender=="F",][,Gender:=NULL],
+  "Male"=ptData2[Gender=="M",][,Gender:=NULL],
+  "Smoked"=ptData2[SmokingStatus=="History of smoking",][,SmokingStatus:=NULL],
+  "Never Smoked"=ptData2[SmokingStatus=="No history of smoking",][,SmokingStatus:=NULL]
+)
+
+
+
+#Check covariate overlap for positivity assumption
+
+subgroup_analyses_secondary<-lapply(secondary_subgroups,whole_analysis_func)
+```
+
+
+```{r subgroup-tbl}
+#| eval: true
+
+
+data.table(
+  "Patient Population"=names(secondary_subgroups),
+  "Primary"=sapply(subgroup_analyses_primary,function(x)x$HR_95_CI["HR(95%CI)"]),
+  "secondary"=sapply(subgroup_analyses_secondary,function(x)x$HR_95_CI["HR(95%CI)"])
+) |> 
+  kable(caption = "Table XX. Hazard ratio and 95% confidence interval of proceeding to 1L without waiting for both primary and secondary analyses.")
+
+
+```
+
+
+\
+
+## Check assumptions
+
+First, check the positivity assumption by looking at the love plot. I generated pdf files titled "primary_cov_plot.pdf" and "secondary_cov_plot.pdf"
+
+
+```{r save-subgroup-love-plot}
+#| eval: true
+#| include: false
+
+
+#Save the covariance balance plot
+
+primary_loveplots<-lapply(subgroup_analyses_primary,function(x)x$cov_balance_plot)
+secondary_loveplots<-lapply(subgroup_analyses_secondary,function(x)x$cov_balance_plot)
+
+for(i in 1:length(primary_loveplots)){
+  primary_loveplots[[i]]<- primary_loveplots[[i]]+ggtitle(names(subgroup_analyses_primary)[[i]])
+  secondary_loveplots[[i]]<- secondary_loveplots[[i]]+ggtitle(names(subgroup_analyses_secondary)[[i]])
+
+}
+
+library(ggpubr)
+#Plot 6 on each page 
+n_per_page<-6
+chunk_seq <- function(N, x) {
+  v   <- seq_len(N)
+  grp <- ceiling(seq_along(v) / x)
+  split(v, grp)
+}
+loop_over_this<-chunk_seq(length(primary_loveplots),n_per_page)
+
+
+pdf("primary_cov_plot.pdf",width=15, height=10)
+for(i in 1:length(loop_over_this)){
+  
+  index<-loop_over_this[[i]]
+  love_plots_out<-primary_loveplots[index]
+  
+  these_plots<-ggarrange(plotlist=love_plots_out,
+                         nrow=3,
+                         ncol=2,
+                         common.legend = T, legend = "top")
+  print(these_plots)
+
+  
+}
+
+dev.off()
+
+
+
+pdf("secondary_cov_plot.pdf",width=15, height=10)
+for(i in 1:length(loop_over_this)){
+  
+  index<-loop_over_this[[i]]
+  love_plots_out<-secondary_loveplots[index]
+  
+  these_plots<-ggarrange(plotlist=love_plots_out,
+                         nrow=3,
+                         ncol=2,
+                         common.legend = T, legend = "top")
+  print(these_plots)
+
+  
+}
+
+dev.off()
+
+
+```
+
+Upon reviewing the love plot, we noticed that the standardized mean difference of 
+Please note that the covariate balance was not achieved between the wait vs. no wait cohorts in ECOG 3-4 subgroup for the primary analysis (and barely for Asians), and Asian subgroups for secondary analysis.
+
+
+We provide SMD table of ECOG 3-4 subgroup in primary analysis:
+
+
+```{r tbl-subgroup-primary-ecog3-4}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| tbl-cap: Summary of Patient Characteristics at Baselien
+
+
+# build gt table
+gt(subgroup_analyses_primary$`ECOG (3-4)`$SMD_table) |> 
+  # First two columns stay as-is:
+  cols_label(
+    this.rownames = "Variable",
+    level         = "Level",
+    # now override the 6 numeric columns’ *display* labels:
+    wait       = "Wait",
+    no_wait    = "No wait",
+    SMD        = "SMD",
+    wait_sw    = "Wait",
+    no_wait_sw = "No wait",
+    SMD_sw     = "SMD"
+  ) |> 
+  # create the two spanners:
+  tab_spanner(
+    label   = "No IPW",
+    columns = c(wait, no_wait, SMD)
+  ) |> 
+  tab_spanner(
+    label   = "IPW",
+    columns = c(wait_sw, no_wait_sw, SMD_sw)
+  ) |> 
+  # optional styling:
+  opt_align_table_header("left") |> 
+  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline, without IPW weighting.")) |> 
+  as_raw_html()  #this will display the table on
+
+```
+
+As we can see we don't have enough sample size to make any meaningful comparison. So we should discard the result.
+
+
+
+Below is SMD table of Asians subgroup in the secondary analysis:
+
+```{r tbl-subgroup-secondary-Asian}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| tbl-cap: Summary of Patient Characteristics at Baselien
+
+
+# build gt table
+gt(subgroup_analyses_secondary$Asian$SMD_table) |> 
+  # First two columns stay as-is:
+  cols_label(
+    this.rownames = "Variable",
+    level         = "Level",
+    # now override the 6 numeric columns’ *display* labels:
+    wait       = "Wait",
+    no_wait    = "No wait",
+    SMD        = "SMD",
+    wait_sw    = "Wait",
+    no_wait_sw = "No wait",
+    SMD_sw     = "SMD"
+  ) |> 
+  # create the two spanners:
+  tab_spanner(
+    label   = "No IPW",
+    columns = c(wait, no_wait, SMD)
+  ) |> 
+  tab_spanner(
+    label   = "IPW",
+    columns = c(wait_sw, no_wait_sw, SMD_sw)
+  ) |> 
+  # optional styling:
+  opt_align_table_header("left") |> 
+  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline, without IPW weighting.")) |> 
+  as_raw_html()  #this will display the table on
+
+```
+
+
+For these guys, It seems like most of them didn't lost more than 10 lbs regardless of waiting or no waiting. So let's exclude this covariate. Also, we have very small sample size for NSCLC histology NOS for histology. We will group this with Squamous cell carcinoma. This grouping is based on clinical understanding that non-squamous cell carcinoma patients are observed to have targetable mutation than squamous cell carcinoma and NSCLC histology NOS.
+
+```{r}
+#| eval: false
+#| include: false
+
+
+tmp<-copy(secondary_subgroups$Asian)
+tmp[,lost_10lbs:=NULL]
+tmp[Histology=="NSCLC histology NOS",Histology:="Squamous cell carcinoma"]
+rerun_second_asian<-whole_analysis_func(tmp)
+rerun_second_asian$SMD_table
+
+rerun_second_asian$HR_95_CI
+
+
+```
+
+
+
+
+
+```{r}
+#| eval: false
+#| include: false
+subgroup_analyses_primary$`ECOG (3-4)`$SMD_table
+#Did anyone lost weight in no_wait group?
+ptData2[AdvancedDiagnosis_year_rescale==7, unique(AdvancedDiagnosis_year) ] #2018
+#wait patients were more like early to middle 2018, 
+#no wait patienst were more like late 2019. 
+#Let's calculate for ECOG subgroup when I do subgroup analysis by diagnosis year.
+
+
+subgroup_analyses_secondary$Asian$SMD_table #Weight loss and 
+```
+
+
+
+\
+
+
+# Subgroup by year
+
+Treatment availabilities greatly differ over time due to rapid development of treamtent for targetable mutation that happened over the time period during which the patients were collected. Thus, we desire to perform analysis over different year
+
+
+
+
+```{r subgroup-diag-year}
+#| eval: true
+#| include: false
+
+
+these_years<-unique(ptData1$AdvancedDiagnosis_year) |> sort()
+subgroup_diag_year<-
+lapply(these_years,function(this_year){
+  ptData1[AdvancedDiagnosis_year==this_year,][,AdvancedDiagnosis_year_rescale:=NULL]
+})
+
+primary<-lapply(subgroup_diag_year,whole_analysis_func)
+
+subgroup_diag_year<-
+lapply(these_years,function(this_year){
+  ptData2[AdvancedDiagnosis_year==this_year,][,AdvancedDiagnosis_year_rescale:=NULL]
+})
+secondary<-lapply(subgroup_diag_year,whole_analysis_func)
+
+
+```
+
+
+
+
+
+```{r fig.show="hold", out.width='49%',  fig.height=5}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: fig-subgroup-by_year
+#| fig-cap: Figure XX. HR(95%CI) of those who don't wait for test result prior to initiating 1L therapy. A) primary analysis, B) Isecondary analysis. 
+
+
+
+
+tmptmp<-
+data.table(
+  "Advanced diagnosis year"=these_years,
+  "Primary"=sapply(primary,function(x)x$HR_95_CI["HR(95%CI)"]),
+  "secondary"=sapply(secondary,function(x)x$HR_95_CI["HR(95%CI)"])
+) 
+
+
+
+# tmptmp|> 
+#   kable(caption = "Table XX. Hazard ratio and 95% confidence interval by advanced diagnosis year")
+
+
+#Plot instead
+primary_plot<-
+sapply(tmptmp$Primary,function(x){
+  all_numbers<-stringr::str_extract_all(x,"-?\\d*\\.?\\d+([eE][+-]?\\d+)?")[[1]]
+  all_numbers<-as.numeric(all_numbers)
+  names(all_numbers)<-c("est","lwr","upr")
+  all_numbers
+})
+primary_plot<-t(primary_plot)
+
+primary_plot<-
+data.table(
+  year=tmptmp$`Advanced diagnosis year`,
+  primary_plot
+)
+
+
+
+secondary_plot<-
+sapply(tmptmp$secondary,function(x){
+  all_numbers<-stringr::str_extract_all(x,"-?\\d*\\.?\\d+([eE][+-]?\\d+)?")[[1]]
+  all_numbers<-as.numeric(all_numbers)
+  names(all_numbers)<-c("est","lwr","upr")
+  all_numbers
+})
+secondary_plot<-t(secondary_plot)
+
+secondary_plot<-
+data.table(
+  year=tmptmp$`Advanced diagnosis year`,
+  secondary_plot
+)
+
+
+
+#Primary analysis
+ggplot(primary_plot, aes(x=factor(year), y=est)) + 
+  geom_errorbar(aes(ymin=lwr, ymax=upr), width=.1) +
+  geom_line() +
+  geom_point()+
+  geom_hline(yintercept = 1,color="red")  +
+  ylab("Survival rate (95% CI)")+
+  xlab("Diagnosis year")+
+  theme_minimal() + 
+  ggtitle("A) Primary analysis")
+
+
+#Secondary analysis
+ggplot(secondary_plot, aes(x=factor(year), y=est)) + 
+  geom_errorbar(aes(ymin=lwr, ymax=upr), width=.1) +
+  geom_line() +
+  geom_point()+
+  geom_hline(yintercept = 1,color="red")  +
+  ylab("Survival rate (95% CI)")+
+  xlab("Diagnosis year")+
+  theme_minimal() + 
+  ggtitle("A) Secondary analysis")
+
+```
+
+I can't see much changes over the year.
 
