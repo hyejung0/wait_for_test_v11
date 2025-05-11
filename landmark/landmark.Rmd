@@ -1367,18 +1367,20 @@ setnames(
   new=c("1L therapy type","Have targetable mutation by time zero")
 )
 
-cont_table<-cont_table[,.N,by=.(`1L therapy type`,`Have targetable mutation by time zero`)]
-cont_table<-dcast(cont_table,`1L therapy type`~`Have targetable mutation by time zero`,value.var = "N")
+cont_table[,table(`1L therapy type`,`Have targetable mutation by time zero` )]
+
+# cont_table<-cont_table[,.N,by=.(`1L therapy type`,`Have targetable mutation by time zero`)]
+# cont_table<-dcast(cont_table,`1L therapy type`~`Have targetable mutation by time zero`,value.var = "N")
+# 
 
 
-
-cont_table %>% 
-  rename("\t" = `1L therapy type`) %>% 
-  add_column(" " = c("1L therapy type", rep(" ", nrow(.) - 1)), .before = "\t") %>% 
-  kable() %>% 
-  kable_styling(position = "left", full_width = F, ) %>% 
-  add_header_above(c("", "", "Have targetable mutation by time zero", rep(" ", ncol(cont_table) - 2))) %>% 
-  column_spec(1:2, bold = TRUE) 
+# cont_table %>% 
+#   rename("\t" = `1L therapy type`) %>% 
+#   add_column(" " = c("1L therapy type", rep(" ", nrow(.) - 1)), .before = "\t") %>% 
+#   kable() %>% 
+#   kable_styling(position = "left", full_width = F, ) %>% 
+#   add_header_above(c("", "", "Have targetable mutation by time zero", rep(" ", ncol(cont_table) - 2))) %>% 
+#   column_spec(1:2, bold = TRUE) 
 
 ```
 
@@ -2503,7 +2505,8 @@ tmp |>
       rows    = `Patient Population` == "Asian"
     ),
     placement = "right"
-  )    
+  ) |> 
+  as_raw_html()
   
 
 ```
@@ -3747,7 +3750,8 @@ tmp |>
       rows    = `Patient Population` == "Asian"
     ),
     placement = "right"
-  )    
+  )  |> 
+  as_raw_html()
   
 
 ```
