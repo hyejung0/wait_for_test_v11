@@ -5,7 +5,7 @@ author: "Hyejung Lee <hyejung.lee@utah.edu>"
 date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
 always_allow_html: true
 output:
-  github_document:
+  bookdown::github_document2:
     toc: true
     toc_depth: 4
     html_preview: true
