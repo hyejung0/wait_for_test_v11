@@ -1,7 +1,7 @@
 Landmark Analysis
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Sat May 10, 2025 10:50:43 PM
+Mon May 12, 2025 12:54:03 PM
 
 - [1 Context](#1-context)
 - [2 Research Aims](#2-research-aims)
@@ -223,7 +223,7 @@ We have 85201 patients without any exclusion.
 
 Summary table:
 
-<div id="dpmqxvkzno"
+<div id="uhaarkcoat"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -594,7 +594,7 @@ category for the analysis.
 
 Generate IPW, and re-construct the table.
 
-<div id="kzlwmdwlgr"
+<div id="teviiozght"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -1223,7 +1223,7 @@ Advanced Diagnosis, and Targetable mutation reported high SMD, ranging
 from 0.135 to 0.324. Thus, the covariate blance was really off. Below we
 present the table of covariate distribution before and after IPW.
 
-<div id="hghdluxgin"
+<div id="evqwweixml"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -1827,7 +1827,7 @@ observe the baseline covariates.
 
 Summary table:
 
-<div id="zxpwqsmytf"
+<div id="ixnhzgqzpo"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -2196,7 +2196,7 @@ Hispanic/Latino. Thus, they are combined with “Other” group.
 
 Generate IPW, and re-construct the table.
 
-<div id="fbzctcyhah"
+<div id="ixcvwbmtof"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -2865,7 +2865,7 @@ likewise for never-smoked supbgroup under the secondary inclusion
 criteria. Thus, we cannot make causal inference for them. Below, we
 provide results excluding these cases.
 
-<div id="zataghhguo"
+<div id="lrjvbyssdl"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -3091,19 +3091,32 @@ As we can see in the plot above, there isn’t much trend in hazard ratio.
 
 ## 8.1 target therapy in no-wait cohort exploration
 
-**Q**: In the Secondary analysis of the whole population, there are
-people in “no_wait” cohort who received targetable therapy. Is this just
-data error? Or is there some particular demographics that demostrates
-this?
+**Q**: In the Secondary analysis of Aim 1, there are people in “no_wait”
+cohort who received targetable therapy (Figure
+<a href="#fig:fig-secondary-1L">5.5</a>). Is this just data error? Or is
+there some particular demographics that demonstrates this?
 
-<div id="xbxongqngq"
+**A**: We just looked at the baseline characteristics of all covariates
+we used. It’s shown in Table
+<a href="#tab:tbl-secondary-target-investigate-copy">8.1</a>. Based on
+the table, it seems like the wait patients patients who either didn’t
+receive any therapy or received something else than target therapy have
+the following that are opposite to those who received targeted therapy.:
+
+- higher proportion of having history of smoking than not
+- higher proportion of Squamous cell carcinoma than other kinds
+- slightly more male than female
+
+<div id="bzxhmiylpc"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
 <caption>
 (#tab:tbl-secondary-target-investigate-copy)<span class="gt_from_md">Table
-XX. Summary of patient characteristics at baseline. Secondary inclusion,
-no-wait cohort. Stratified by their respective 1L therapy.</span>
+XX. Summary of patient characteristics at baseline. Restricted to
+‘No-wait’ cohort from the Secondary inclusion criteria. The patients
+were stratified by the type 1L therapy. ‘something_else’ stratum also
+contains those who did not receive any 1L therapy.</span>
 </caption>
 <thead style="border-style: none;">
 <tr class="gt_col_headings" style="border-style: none; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3;">
@@ -3445,26 +3458,16 @@ style="font-size: 75%; vertical-align: 0.4em; position: initial; white-space: no
 
 </div>
 
-Based on the table above, it seems like among the patients patients who
-waited to have valid therapy results and either didn’t receive any
-therapy or received something else than target therapy have:
-
-- higher proportion of having history of smoking tha not
-- higher proportion of Squamous cell carcinoma than other kinds
-- slightly more male than female
-
-compared to those who waited for valid therapy results and received
-targeted therapy.
+Is this cross-reference working?
+<a href="#tab:tbl-secondary-target-investigate-copy">8.1</a>.
 
   
 
 ## 8.2 build KM curve comparing target vs something else therapy for primary inclusion criteria
 
 **Q**: Under the Aim 1, where I conduct the analysis using primary
-criteria, I showed KM curve of those who received target therapy vs
-those who either received something else or didn’t receive anything
-under primary inclusion criteria, I show KM curve of those who received
-targetable therapy vs not (including those who didn’t)
+inclusion criteria, I show KM curve of those who received targetable
+therapy vs not (including those who didn’t)
 <a href="#fig:fig-secondary-KMplot">5.4</a>. Please rebuild by
 
 1.  restricting to only “wait” cohort
@@ -3476,23 +3479,26 @@ Additionally, provide 2 by 2 contingency table showing the 1L therapy
 type (Target vs. not Target) and whether the patient had targetable
 mutation by time zero.
 
-First, here’s my presentation of 2 by 2 contingency table, showing the
-1L therapy type (Target or not) and whether the patient had targetable
-mutation by time zero:
+**A**: Sound good. Under the primary inclusion criteria, we selected
+“wait” cohort and generated a binary variable indicating whether or not
+patient has targetable mutation at time zero.
 
-    ##                 Have targetable mutation by time zero
-    ## 1L therapy type    No  Yes
-    ##   something else 1691  586
-    ##   Target therapy   25  239
-
+Below is the 2 by 2 contingency table showing the 1L therapy type
+(Target or not) and whether the patient had targetable mutation by time
+zero (Table
+<a href="#tab:target-therapy-mutation-status-contingency-table-v2">8.2</a>).
 Based on the above contingency table, there are people who have
-targetable mutation but still got something else (N=586).
+targetable mutation but still got something else (N=586).:
 
-To check if targetable mutation patients really live longer or not, we
-generated IPW applied KM plot, comparing those who received targetable
-therapy versus not (whether they received anything or not). The
-variables used to generate IPW are the same as used in the main
-analysis.
+Table:
+<span id="tab:target-therapy-mutation-status-contingency-table-v2"></span>Table
+8.2:  
+Contingency of X1 vs X2. Have targetable mutation by time zero 1L
+therapy type No Yes something else 1691 586 Target therapy 25 239
+
+To check if receiving targetable therapy is really beneficial for
+survival, we show the KM plot by the type 1L therapy. The samples used
+in the KM plot is IPW adjusted samples.
 
 To build IPW, I thought it would be more appropriate to find the values
 around the time the person received 1L therapy (Among those who received
@@ -3508,7 +3514,7 @@ Diagnosis, and Targetable mutation reported high SMD, ranging from 0.141
 to 0.361. Thus, the covariate balance was really off. Below we present
 the table of covariate distribution before and after IPW.
 
-<div id="hbiwavfcov"
+<div id="zczlxdrwtw"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -3989,7 +3995,7 @@ or patients.
 
 **A**: The modification was applied directly to section {#aim-2}
 
-<div id="swkjdrrdbs"
+<div id="mrcncpspze"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -4221,7 +4227,7 @@ XX. Plots of proportion missing
 
 #### 8.4.2.2 Correlate subject-level missing rates with auxiliaries
 
-<div id="kpxshrjknc"
+<div id="rcqidtsdpg"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -4537,7 +4543,7 @@ WBC
 
 </div>
 
-<div id="hkslxkppbd"
+<div id="izdmwkmquf"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">

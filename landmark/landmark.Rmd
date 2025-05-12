@@ -3240,14 +3240,21 @@ As we can see in the plot above, there isn't much trend in hazard ratio.
 
 ## target therapy in no-wait cohort exploration
 
-**Q**: In the Secondary analysis of the whole population, there are people in "no_wait" cohort who received targetable therapy. Is this just data error? Or is there some particular demographics that demostrates this?
+**Q**: In the Secondary analysis of Aim 1, there are people in "no_wait" cohort who received targetable therapy (Figure \@ref(fig:fig-secondary-1L)). Is this just data error? Or is there some particular demographics that demonstrates this?
 
 
 
-```{r}
+**A**: We just looked at the baseline characteristics of all covariates we used. It's shown in Table \@ref(tab:tbl-secondary-target-investigate-copy). Based on the table, it seems like the wait patients patients who either didn't receive any therapy or received something else than target therapy have the following that are opposite to those who received targeted therapy.:
+
+- higher proportion of having history of smoking than not
+- higher proportion of Squamous cell carcinoma than other kinds
+- slightly more male than female
+
+
+
+```{r tbl-secondary-target-investigate-copy, results='asis'}
 #| eval: true
 #| echo: false
-#| label: tbl-secondary-target-investigate-copy
 
 
 #Investigate what's going on
@@ -3275,18 +3282,13 @@ tbl_summary(
   #   title = md("What's the difference between this title and caption?"),
   #   subtitle = md("`gtcars` is an R dataset")
   # ) |>
-  tab_caption(caption = md("Table XX. Summary of patient characteristics at baseline. Secondary inclusion, no-wait cohort. Stratified by their respective 1L therapy.")) |> 
-  as_raw_html() 
+  tab_caption(caption = md("Table XX. Summary of patient characteristics at baseline. Restricted to 'No-wait' cohort from the Secondary inclusion criteria. The patients were stratified by the type 1L therapy. 'something_else' stratum also contains those who did not receive any 1L therapy.")) |> 
+  as_raw_html() |> 
+  cat()
 ```
 
 
-Based on the table above, it seems like among the patients patients who waited to have valid therapy results and either didn't receive any therapy or received something else than target therapy have:
-
-- higher proportion of having history of smoking tha not
-- higher proportion of Squamous cell carcinoma than other kinds
-- slightly more male than female
-
-compared to those who waited for valid therapy results and received targeted therapy.
+Is this cross-reference working? \@ref(tab:tbl-secondary-target-investigate-copy).
 
 
 \
@@ -3294,13 +3296,16 @@ compared to those who waited for valid therapy results and received targeted the
 
 ## build KM curve comparing target vs something else therapy for primary inclusion criteria
 
-**Q**: Under the Aim 1, where I conduct the analysis using primary criteria, I showed KM curve of those who received target therapy vs those who either received something else or didn't receive anything  under primary inclusion criteria, I show KM curve of those who received targetable therapy vs not (including those who didn’t) \@ref(fig:fig-secondary-KMplot). Please rebuild by 
+**Q**: Under the Aim 1, where I conduct the analysis using primary inclusion criteria, I show KM curve of those who received targetable therapy vs not (including those who didn’t) \@ref(fig:fig-secondary-KMplot). Please rebuild by 
 
 
 1. restricting to only "wait" cohort
 2. Include binary indicator variable whether or not the patients has mutation by the time they receive 1L therapy IPW including all baseline demographics + lab values which I am already including.
 
 Additionally, provide 2 by 2 contingency table showing the 1L therapy type (Target vs. not Target) and whether the patient had targetable mutation by time zero. 
+
+
+**A**:  Sound good. Under the primary inclusion criteria, we selected "wait" cohort and generated a binary variable indicating whether or not patient has targetable mutation at time zero. 
 
 
 
@@ -3554,9 +3559,11 @@ ptData1_wait_out_median_else<-ptData1_wait_out$median_survivals$yes_ipw$"cohort=
 
 
 
-First, here's my presentation of 2 by 2 contingency table, showing the 1L therapy type (Target or not) and whether the patient had targetable mutation by time zero:
+Below is the 2 by 2 contingency table showing the 1L therapy type (Target or not) and whether the patient had targetable mutation by time zero (Table \@ref(tab:target-therapy-mutation-status-contingency-table-v2)). Based on the above contingency table, there are people who have targetable mutation but still got something else (N=586).:
 
-```{r target-therapy-mutation-status-contingency-table-v2}
+Table: (\#tab:target-therapy-mutation-status-contingency-table-v2)  
+Contingency of X1 vs X2.
+```{r target-therapy-mutation-status-contingency-table-v2, results='asis'}
 #| echo: false
 #| eval: true
 #| warning: false
@@ -3593,10 +3600,9 @@ cont_table[,table(`1L therapy type`,`Have targetable mutation by time zero` )]
 
 ```
 
-Based on the above contingency table, there are people who have targetable mutation but still got something else (N=586).
 
 
-To check if targetable mutation patients really live longer or not, we generated IPW applied KM plot, comparing those who received targetable therapy versus not (whether they received anything or not). The variables used to generate IPW are the same as used in the main analysis.
+To check if receiving targetable therapy is really beneficial for survival, we show the KM plot by the type 1L therapy. The samples used in the KM plot is IPW adjusted samples.
 
 To build IPW, I thought it would be more appropriate to find the values around the time the person received 1L therapy (Among those who received 1L therapy). But among those who received 1L therapy, 8 people didn't have any record of ECOG between 2 months before and up to 1L therapy date and 77 people didn't have any albumin observed 6 weeks prior to and up to 1L theray date. So we decided to just drop all time-varying variables: ECOG, albumin, weight change. And we used demographic (fixed values) and whethe or not they had targetable mutation identified.  
 
