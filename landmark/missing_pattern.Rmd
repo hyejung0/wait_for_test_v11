@@ -1,0 +1,923 @@
+---
+title: "Landmark Analysis - find out pattenrs of missing"
+subtitle: "version 1"
+author: "Hyejung Lee <hyejung.lee@utah.edu>"
+date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
+always_allow_html: true
+output:
+  bookdown::github_document2:
+    toc: true
+    toc_depth: 4
+    html_preview: true
+  # bookdown::html_document2:
+  #   self-contained: true
+  #   embed-resources: true
+  #   code-fold: true
+  #   toc: true
+  #   toc_depth: 4
+  #   theme: united
+  #   toc_float: true
+  #   number-sections: true
+  # word_document:
+  #   toc: true
+  #   toc_depth: 3
+  #   number_sections: true
+# bibliography: references.bib
+# csl: nature.csl
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(
+  echo=FALSE,
+  cache      = TRUE,
+  cache.lazy = FALSE,   # turn *off* the lazy‐load DB
+  cache.path = "missing_pattern_cache/" # where to put your .rds files
+)
+
+# knitr::knit_hooks$set(chunk = function(x, options) x) #for knitting word_document only
+# knitr::opts_knit$set(root.dir = "./SAP")
+# remotes::install_github('yihui/knitr')
+# library(knitr)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(survival)
+library(survminer)
+library(officer)
+library(officedown)
+library(flextable)
+library(data.table)
+library(parallel)
+library(kableExtra)
+library(knitr)
+library(lubridate)
+library(tictoc)
+library(gt)
+library(gtsummary)
+library(tidyverse)
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+
+
+
+
+
+
+ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+setDTthreads(threads = ncores)
+
+```
+
+```{r pattern-missing-data}
+#| echo: false
+#| eval: false
+
+
+#generate data set for identifying patterns of missing
+#don't run it in the "knit" because I've already run and 
+#saved items as RDS file.
+
+#Read in the data 
+ptData_missing<-readRDS("../ptData_time0_diag_v2.rds")
+ptData_missing[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
+ptData_missing[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+ptData_missing[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+ptData_missing[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
+ptData_missing[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
+
+
+
+
+
+#Time 0 is 5th week
+ptData_missing[,time0:=NULL]
+ptData_missing[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4)+days(1))]
+
+
+#Now treatment assignment.
+ptData_missing[,cohort:="wait"]
+ptData_missing[advDiag_to_1L_week<advDiag_to_valid_test_week,cohort:="no_wait"]
+ptData_missing[,cohort:=factor(cohort,levels=c("wait","no_wait"), labels=c("wait","no_wait"))]
+
+
+#generate yearly count of advanced diagnosis date
+ptData_missing[,AdvancedDiagnosis_year:=year(AdvancedDiagnosisDate)]
+ptData_missing[,AdvancedDiagnosis_year_factor:=factor(AdvancedDiagnosis_year,levels = sort(unique(AdvancedDiagnosis_year), decreasing = F), labels = sort(unique(AdvancedDiagnosis_year), decreasing = F))]
+
+# ptData1[,min(AdvancedDiagnosis_year)] #2011
+ptData_missing[,AdvancedDiagnosis_year_rescale:=AdvancedDiagnosis_year-min(AdvancedDiagnosis_year)] #make first one 0.
+
+
+
+
+
+#Choose the variables that Wally had previously identified for me
+
+
+lab<-readRDS("../../labs/raw_lab.rds")
+vars<-readRDS("../../labs/baseline_covariates.rds")
+lab_vars<-unique(vars$variables)
+
+#Exclude carbon dioxide as it changes too frequently.
+lab_vars<-lab_vars[lab_vars!="Carbon dioxide"]
+
+
+
+
+lab_values_out<-
+lapply(lab_vars,function(this_vars){
+
+  #there can be several different baselines we want to use,
+  #choose only one here.
+  #set the character string that corresponds to the column name.
+  this.baseline<-"AdvancedDiagnosisDate"
+
+
+  #save the rows we want to use
+  this_Test<-vars[variables==this_vars,unique(Test)]
+
+  #Save the subdat
+  temp<-lab[Test %in% this_Test,]
+
+  #remove all invalid dataset
+  temp<-temp[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
+
+
+  #subset the data to what we need.
+  these.cols<-c("PatientID",this.baseline)
+  temp<-merge.data.table(ptData_missing[,..these.cols],
+                         temp[,.(PatientID,TestDate,TestUnitsCleaned,TestResultCleaned)],
+                         by="PatientID",
+                         all.x=TRUE,
+                         allow.cartesian=TRUE)
+
+  setnames(temp, this.baseline,"time0")
+  ### Entry Criteria - start ###
+  #For baseline value, time windows are:
+  #(-12 weeks,4 weeks]
+  #(-12 weeks,1 week]
+
+  #generate two
+  baseline_dat<-copy(temp)
+  baseline_dat[,min_date:=as.IDate(as.Date(time0)- weeks(12))]
+
+  #two different cut off for the baseline
+  #Up to 4 weeks after
+  #Up to 1 week after
+  #Baseline up to 1 week after:
+  bdat1<-copy(baseline_dat)
+  bdat1[,max_date:=as.IDate(as.Date(time0)+ weeks(1))]
+
+  #Baseline up to 4 weeks after:
+  bdat4<-copy(baseline_dat)
+  bdat4[,max_date:=as.IDate(as.Date(time0)+ weeks(4))]
+
+  #Save them as a list
+  baseline_dat_list<-list(
+    "week1"=bdat1,
+    "week4"=bdat4
+  )
+
+  baseline_dat_list<-
+    lapply(baseline_dat_list,function(baseline_dat){
+      #Extract only those that are within this time frame
+      baseline_dat<-baseline_dat[min_date<=TestDate & max_date>=TestDate,]
+      baseline_dat<-baseline_dat[,days_to_time0:=time0-TestDate]
+      baseline_dat
+    })
+
+baseline_dat_list
+})
+names(lab_values_out)<-lab_vars
+
+#ECOG
+baselineECOG<-readRDS("../../../Data/BaselineECOG.rds")
+baselineECOG<-baselineECOG[PatientID %in% ptData_missing$PatientID,]
+baselineECOG[ECOGValue=="Unknown",ECOGValue:=NA]
+baselineECOG[,ECOGValue:=as.integer(ECOGValue)]
+setnames(baselineECOG,"ECOGValue","EcogValue")
+setnames(baselineECOG,"ECOGDate","Date")
+baselineECOG[,Date:=as.IDate(Date)]
+
+
+ECOG<-readRDS("../../../Data/ECOG.rds")
+ECOG<-ECOG[PatientID %in% ptData_missing$PatientID,]
+setnames(ECOG,"EcogDate","Date")
+ECOG<-unique(ECOG[,.(PatientID,Date,EcogValue)])
+ECOG[,N:=.N,by=.(PatientID,Date)]
+ECOG[N>1,] #We will take average
+ECOG2<-ECOG[,mean(as.numeric(EcogValue),na.rm=T),by=.(PatientID,Date)]
+ECOG2
+setnames(ECOG2,"V1","EcogValue")
+
+#get them merged
+both_ECOG<-
+  merge(unique(baselineECOG[,.(PatientID,Date,EcogValue)]),
+        ECOG2[,.(PatientID,Date,EcogValue)],
+        by=c("PatientID","Date"),
+        all=T)
+both_ECOG[,EcogValue.x:=as.numeric(EcogValue.x)]
+both_ECOG[is.na(EcogValue.x),EcogValue.x:=EcogValue.y]
+both_ECOG[,EcogValue.y:=NULL]
+setnames(both_ECOG,"EcogValue.x","EcogValue")
+rm(list=c("baselineECOG","ECOG"))
+both_ECOG
+#Average if more than 1 observed
+# both_ECOG<-both_ECOG[,mean(EcogValue, na.rm=T),by=.(PatientID,Date)]
+
+temp<-merge.data.table(ptData_missing[,.(PatientID,AdvancedDiagnosisDate)],
+                         both_ECOG,
+                         by="PatientID",
+                         all.x=TRUE,
+                         allow.cartesian=TRUE)
+
+
+ ### Entry Criteria - start ###
+  #For baseline value, time windows are:
+  #(-4 months,4 weeks]
+  #(-4 months,1 week]
+
+  #generate two
+  ECOG_tmp<-copy(temp)
+  ECOG_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(4))]
+
+  #two different cut off for the baseline
+  #Up to 4 weeks after
+  #Up to 1 week after
+  #Baseline up to 1 week after:
+  bdat1<-copy(ECOG_tmp)
+  bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(1))]
+
+  #Baseline up to 4 weeks after:
+  bdat4<-copy(ECOG_tmp)
+  bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(4))]
+
+  #Save them as a list
+  baseline_dat_list<-list(
+    "week1"=bdat1,
+    "week4"=bdat4
+  )
+
+  baseline_dat_list<-
+    lapply(baseline_dat_list,function(baseline_dat){
+      #Extract only those that are within this time frame
+      baseline_dat<-baseline_dat[min_date<=Date & max_date>=Date,]
+      baseline_dat<-baseline_dat[,days_to_time0:=AdvancedDiagnosisDate-Date]
+      baseline_dat
+    })
+ECOG<-copy(baseline_dat_list)
+
+
+
+#Weight change
+
+
+#Get baseline weight
+vital<-readRDS("../../../Data/Vitals.rds")
+vital<-vital[PatientID %in% ptData_missing$PatientID,]
+
+#How many people have weight?
+count_weight<-vital[,sum(Test=="body weight"),by=PatientID]
+count_weight[,sum(V1==0)]
+#224 people have 0 weight. very small number of people. Good.
+weight<-vital[Test=="body weight",]
+
+#Want to use kg
+#Is there any missing?
+weight[is.na(TestResult) & !is.na(TestResultCleaned),.N]
+weight[!is.na(TestResult) & is.na(TestResultCleaned),.N]
+weight[!is.na(TestResult) & is.na(TestResultCleaned),]
+weight[!is.na(TestResult) & is.na(TestResultCleaned),.(TestResult,TestUnits,TestResultCleaned,TestUnitsCleaned)]
+#All of TestResult are missing units.
+#Just use TestResultCleaned.
+
+
+#remove all invalid dataset
+temp<-weight[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
+temp<-temp[,mean(TestResultCleaned,na.rm=T),by=.(PatientID,TestDate)] #average out if we have more than one observed.
+setnames(temp,"V1","TestResultCleaned")
+#subset the data to what we need.
+temp<-merge.data.table(ptData_missing[,.(PatientID,AdvancedDiagnosisDate)],
+                       temp[,.(PatientID,TestDate,TestResultCleaned)],
+                       by="PatientID",
+                       all.x=TRUE,
+                       allow.cartesian=TRUE)
+
+#1 year prior to 1 week or 4 weeks after.
+weight_tmp<-copy(temp)
+weight_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(12))]
+
+#two different cut off for the baseline
+#Up to 4 weeks after
+#Up to 1 week after
+#Baseline up to 1 week after:
+bdat1<-copy(weight_tmp)
+bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(1))]
+
+#Baseline up to 4 weeks after:
+bdat4<-copy(weight_tmp)
+bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(4))]
+
+#Save them as a list
+baseline_dat_list<-list(
+    "week1"=bdat1,
+    "week4"=bdat4
+  )
+
+baseline_dat_list<-
+    lapply(baseline_dat_list,function(baseline_dat){
+      #Extract only those that are within this time frame
+      baseline_dat<-baseline_dat[min_date<=TestDate & max_date>=TestDate,]
+      baseline_dat<-baseline_dat[,days_to_time0:=AdvancedDiagnosisDate-TestDate]
+      baseline_dat
+    })
+Weight<-copy(baseline_dat_list)
+#Average out if more than one is observed.
+
+
+rm(baseline_dat_list)
+rm(weight_tmp)
+rm(ECOG_tmp)
+
+saveRDS(Weight, "Weight_pattern_missing.rds")
+saveRDS(lab_values_out, "lab_values_out_pattern_missing.rds")
+saveRDS(ECOG, "ECOG_pattern_missing.rds")
+
+Weight<-readRDS("Weight_pattern_missing.rds")
+lab_values_out<-readRDS("lab_values_out_pattern_missing.rds")
+ECOG<-readRDS("ECOG_pattern_missing.rds")
+
+#For each variable, store 12 weeks observation be fore advanced diagnosis date
+#and 1 week or 4 weeks after.
+all_obs<-ptData_missing[,.(PatientID,AdvancedDiagnosisDate)]
+all_obs[,week_12:=as.IDate(as.Date(AdvancedDiagnosisDate)-weeks(12))]
+all_obs[,month_4:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(4))]
+all_obs[,year_1:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(12))]
+all_obs[,week_plus_1:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(1))]
+all_obs[,week_plus_4:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4))]
+
+
+#For primary inclusion criteria, we should expand up to 1 week after
+
+
+#Weights
+all_obs_primary_weight<-all_obs[ , .(
+  Date = seq(year_1, week_plus_1, by = "days"),
+  AdvancedDiagnosisDate     = AdvancedDiagnosisDate          # propagate time0 into each new row
+),
+by = PatientID
+]
+all_obs_primary_weight<-
+  merge(all_obs_primary_weight,
+        Weight$week1[,.(PatientID,TestDate,TestResultCleaned)],
+        by.x=c("PatientID","Date"),
+        by.y=c("PatientID","TestDate"),
+        all.x=T
+        )
+setnames(all_obs_primary_weight,"TestResultCleaned","weight")
+
+
+all_obs_secondary_weight<-all_obs[ , .(
+  Date = seq(year_1, week_plus_4, by = "days"),
+  AdvancedDiagnosisDate     = AdvancedDiagnosisDate          # propagate time0 into each new row
+),
+by = PatientID
+]
+all_obs_secondary_weight<-
+  merge(all_obs_secondary_weight,
+        Weight$week4[,.(PatientID,TestDate,TestResultCleaned)],
+        by.x=c("PatientID","Date"),
+        by.y=c("PatientID","TestDate"),
+        all.x=T
+        )
+setnames(all_obs_secondary_weight,"TestResultCleaned","weight")
+
+#combine the weights together
+weight_missing<-list(
+  "week_1" =copy(all_obs_primary_weight),
+  "week_4" =copy(all_obs_secondary_weight)
+)
+
+rm(list=c("all_obs_primary_weight","all_obs_secondary_weight"))
+
+saveRDS(weight_missing,"weight_missing.rds")
+
+
+#ECOG
+all_obs_primary_ECOG<-all_obs[ , .(
+  Date = seq(month_4, week_plus_1, by = "days"),
+  AdvancedDiagnosisDate     = AdvancedDiagnosisDate          # propagate time0 into each new row
+),
+by = PatientID
+]
+all_obs_primary_ECOG<-
+  merge(all_obs_primary_ECOG,
+        ECOG$week1[,.(PatientID,Date,EcogValue)],
+        by=c("PatientID","Date"),
+        all.x=T
+  )
+setnames(all_obs_primary_ECOG,"EcogValue","ECOG")
+
+
+all_obs_secondary_ECOG<-all_obs[ , .(
+  Date = seq(month_4, week_plus_4, by = "days"),
+  AdvancedDiagnosisDate     = AdvancedDiagnosisDate          # propagate time0 into each new row
+),
+by = PatientID
+]
+all_obs_secondary_ECOG<-
+  merge(all_obs_secondary_ECOG,
+        ECOG$week4[,.(PatientID,Date,EcogValue)],
+        by=c("PatientID","Date"),
+        all.x=T
+  )
+setnames(all_obs_secondary_ECOG,"EcogValue","ECOG")
+
+#combine the weights together
+ECOG_missing<-list(
+  "week_1" =copy(all_obs_primary_ECOG),
+  "week_4" =copy(all_obs_secondary_ECOG)
+)
+
+rm(list=c("all_obs_primary_ECOG","all_obs_secondary_ECOG"))
+saveRDS(ECOG_missing,"ECOG_missing.rds")
+
+
+
+
+#Lab values
+all_obs_primary<-all_obs[ , .(
+  Date = seq(week_12, week_plus_1, by = "days"),
+  time0     = AdvancedDiagnosisDate          # propagate time0 into each new row
+),
+by = PatientID
+]
+
+all_obs_secondary<-all_obs[ , .(
+  Date = seq(week_12, week_plus_4, by = "days"),
+  time0     = AdvancedDiagnosisDate          # propagate time0 into each new row
+),
+by = PatientID
+]
+
+
+#Merge the values
+for(i in 1:length(lab_values_out)){
+  print(lab_vars[i])
+  #Some lab values have duplicate. Take mean.
+  this_lab<-lab_values_out[[i]]$week1[,.(PatientID,TestDate,TestResultCleaned)]
+  this_lab<-this_lab[,mean(TestResultCleaned,na.rm=T),by=.(PatientID,TestDate)]
+  setnames(this_lab,"V1","TestResultCleaned")
+
+  all_obs_primary<-
+  merge(all_obs_primary,
+        this_lab,
+        by.x=c("PatientID","Date"),
+        by.y=c("PatientID","TestDate"),
+        all.x=T
+        )
+  setnames(all_obs_primary,"TestResultCleaned",lab_vars[i])
+
+
+
+
+  this_lab<-lab_values_out[[i]]$week4[,.(PatientID,TestDate,TestResultCleaned)]
+  this_lab<-this_lab[,mean(TestResultCleaned,na.rm=T),by=.(PatientID,TestDate)]
+  setnames(this_lab,"V1","TestResultCleaned")
+
+  all_obs_secondary<-
+  merge(all_obs_secondary,
+        this_lab,
+        by.x=c("PatientID","Date"),
+        by.y=c("PatientID","TestDate"),
+        all.x=T
+        )
+  setnames(all_obs_secondary,"TestResultCleaned",lab_vars[i])
+}
+
+labs_missing<-list(
+  "week_1" =copy(all_obs_primary),
+  "week_4" =copy(all_obs_secondary)
+)
+saveRDS(labs_missing,"labs_missing.rds")
+
+
+
+```
+
+```{r pattern-missing-data-readi}
+#| echo: false
+#| eval: false
+
+
+
+#Read in the data set for exploring missingness
+weight_missing<-readRDS("weight_missing.rds")
+ECOG_missing<-readRDS("ECOG_missing.rds")
+labs_missing<-readRDS("labs_missing.rds")
+
+all_obs_primary<-list(
+  "weight"=weight_missing$week_1,
+  "ECOG"=ECOG_missing$week_1,
+  "lab"=labs_missing$week_1
+)
+
+all_obs_secondary<-list(
+  "weight"=weight_missing$week_4,
+  "ECOG"=ECOG_missing$week_4,
+  "lab"=labs_missing$week_4
+)
+
+setnames(all_obs_primary$lab,"time0","AdvancedDiagnosisDate")
+setnames(all_obs_secondary$lab,"time0","AdvancedDiagnosisDate")
+
+
+
+
+
+#get variables of interest (VOI)
+VOI<-c(
+ "Albumin",
+ "ECOG",
+ "weight"
+)
+
+#get auxilliary variables (includes VOI)
+auxilliary<-colnames(all_obs_primary$lab)[!colnames(all_obs_primary$lab) %in%c("PatientID","Date","AdvancedDiagnosisDate",VOI)]
+
+
+
+
+
+
+#Build dataset for one patient
+#For all variable.
+#to do so, we have to restrict to -12 weeks because that's the minimum we chose for the variables.
+all_obs_primary_week12<-
+merge(
+  all_obs_primary$lab,
+  all_obs_primary$weight[,.(PatientID,Date,weight)],
+  by=c("PatientID","Date"),
+  all.x=T
+)
+all_obs_primary_week12<-
+merge(
+  all_obs_primary_week12,
+  all_obs_primary$ECOG[,.(PatientID,Date,ECOG)],
+  by=c("PatientID","Date"),
+  all.x=T
+)
+all_obs_primary_week12[,index:=1:.N,by=PatientID]
+
+
+count_observed<-all_obs_primary_week12[,sum(!is.na(.SD)),by=PatientID,.SDcols=c(VOI,auxilliary)]
+count_observed<-count_observed[order(V1,decreasing = T),]  
+count_observed[1,] #FC85B4F31A510
+#FC85B4F31A510 has the largest number of observation.
+#Save this person to work with.
+one_obs_primary<-all_obs_primary_week12[PatientID=="FC85B4F31A510",.SD,.SDcols=c(VOI,auxilliary)]
+
+
+
+#Secondary inclusion criteria
+all_obs_secondary_week12<-
+  merge(
+    all_obs_secondary$lab,
+    all_obs_secondary$weight[,.(PatientID,Date,weight)],
+    by=c("PatientID","Date"),
+    all.x=T
+  )
+all_obs_secondary_week12<-
+  merge(
+    all_obs_secondary_week12,
+    all_obs_secondary$ECOG[,.(PatientID,Date,ECOG)],
+    by=c("PatientID","Date"),
+    all.x=T
+  )
+all_obs_secondary_week12[,index:=1:.N,by=PatientID]
+
+count_observed<-all_obs_secondary_week12[,sum(!is.na(.SD)),by=PatientID,.SDcols=c(VOI,auxilliary)]
+count_observed<-count_observed[order(V1,decreasing = T),]  
+count_observed[1,] #F94D0B13A35B4
+#F94D0B13A35B4 has the largest number of observation.
+#Save this person to work with.
+one_obs_secondary<-all_obs_secondary_week12[PatientID=="F94D0B13A35B4",.SD,.SDcols=c(VOI,auxilliary)]
+
+
+
+saveRDS(VOI,"VOI.rds")
+saveRDS(auxilliary,"auxilliary.rds")
+
+saveRDS(all_obs_primary_week12,"all_obs_primary_week12.rds")
+saveRDS(one_obs_primary,"one_obs_primary.rds")
+
+saveRDS(all_obs_secondary_week12,"all_obs_secondary_week12.rds")
+saveRDS(one_obs_secondary,"one_obs_secondary.rds")
+
+```
+
+```{r read-data}
+#| eval: true
+#| echo: false
+
+#Read in the data
+
+VOI<-readRDS("VOI.rds")
+auxilliary<-readRDS("auxilliary.rds")
+
+all_obs_primary_week12<-readRDS("all_obs_primary_week12.rds")
+one_obs_primary<-readRDS("one_obs_primary.rds")
+
+all_obs_secondary_week12<-readRDS("all_obs_secondary_week12.rds")
+one_obs_secondary<-readRDS("one_obs_secondary.rds")
+
+
+```
+
+# Context
+
+I've run landmark analysis without imputing any data. But by doing so we
+lost so much samples. Thus, we should look into patterns of missing to
+check if we can impute or not. This idea is from the meeting I had with
+Ben and Tom on 2025/04/30
+
+# Sketch
+
+Since we have longitudinal data set, we will look at pattern of missing
+in two levels:
+
+1.  Across subjects (missingness over each visit), and
+2.  Within subjects (missingness by person over time)
+
+For each lab values, the time interval of data collection was chosen
+with advanced diagnosis date as the day 0:
+
+-   Albumin (originally from - 6 weeks):
+    -   Primary inclusion criteria: $[-12 weeks, 1 week]$
+    -   Secondary inclusion criteria: $[-12 weeks, 4 weeks]$
+-   ECOG (originally from - 2 months):
+    -   Primary inclusion criteria: $[-4 months, 1 week]$
+    -   Secondary inclusion criteria: $[-4 months, 4 week]$
+-   Weight (originally from - 6 months):
+    -   Primary inclusion criteria: $[-1 year, 1 week]$
+    -   Secondary inclusion criteria: $[-1 year, 4 weeks]$
+
+\
+
+# Population level missing
+
+```{r fig.show="hold", out.width='49%',  fig.height=6}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: fig-population-missing
+#| fig-cap: Plots of proportion missing for entire population 
+
+
+
+
+
+#We have total 92 days (- 12 weeks , 1 week) for primary
+#let's calculate proportion missing for each day of these weeks for 
+#each variable.
+
+
+
+all_obs_primary_long<-
+melt(all_obs_primary_week12,id.vars = c("PatientID","index"),measure.vars=c(VOI,auxilliary), variable.name = "var", value.name = "val")
+
+population_summary_primary<-all_obs_primary_long[,mean(is.na(val)),by=.(index,var)]
+setnames(population_summary_primary,"V1","pct_miss")
+
+ggplot(population_summary_primary[var %in% VOI,],
+       aes(x=index, y=pct_miss, color=var)) +
+  geom_line() +
+  labs(y="Percent missing", x="Day number") +
+  theme_minimal()+
+  ggtitle("A) Primary inclusion criteria")
+
+
+
+
+#We have total 113 days (- 12 weeks , 4 week) for primary
+#let's calculate proportion missing for each day of these weeks for 
+#each pvariable.
+
+all_obs_secondary_week12[,index:=1:.N,by=PatientID]
+
+all_obs_secondary_long<-
+  melt(all_obs_secondary_week12,id.vars = c("PatientID","index"),measure.vars=c(VOI,auxilliary), variable.name = "var", value.name = "val")
+
+population_summary_secondary<-all_obs_secondary_long[,mean(is.na(val)),by=.(index,var)]
+setnames(population_summary_secondary,"V1","pct_miss")
+
+
+ggplot(population_summary_secondary[var %in% VOI,],
+       aes(x=index, y=pct_miss, color=var)) +
+  geom_line() +
+  labs(y="Percent missing", x="Day number") +
+  theme_minimal()+
+  ggtitle("B) Secondary inclusion criteria")
+
+```
+
+\
+
+# Subject-level summaries
+
+## Missingness proportion per subject
+
+Again, we will restrict to week 12 before advanced diagnosis date even
+though we have up to 4 months and 1 year before the advanced diagnosis
+date for ECOG and weights.
+
+```{r fig.show="hold", out.width='49%',  fig.height=6, fig.width=10}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: fig-subject-level-missing-v1
+#| fig-cap: Figure XX. Plots of proportion missing
+
+
+
+sub_level_missing_primary1<-all_obs_primary_week12[,lapply(.SD,function(x)mean(is.na(x))),.SDcols = VOI,by=PatientID]
+
+sub_level_missing_secondary1<-all_obs_secondary_week12[,lapply(.SD,function(x)mean(is.na(x))),.SDcols = VOI,by=PatientID]
+
+sub_level_missing_primary1<-
+melt(sub_level_missing_primary1,
+     id.vars="PatientID",
+     measure.vars = VOI,
+     variable.name = "voi",
+     value.name = "rate")
+
+sub_level_missing_secondary1<-
+melt(sub_level_missing_secondary1,
+     id.vars="PatientID",
+     measure.vars = VOI,
+     variable.name = "voi",
+     value.name = "rate")
+
+
+ggplot(sub_level_missing_primary1, mapping = aes(x=rate))+
+    geom_histogram(bins=30) +
+  # geom_histogram(stat="density") +
+  # geom_area(stat = "density", adjust = 0.5)+
+  facet_wrap(~voi) +
+  labs(x="Proportion of days missing") +
+  theme_minimal()+
+  ggtitle("A) Primary inclusion criteria")
+
+
+
+ggplot(sub_level_missing_secondary1, mapping = aes(x=rate))+
+    geom_histogram(bins=30) +
+  # geom_histogram(stat="density") +
+  # geom_area(stat = "density", adjust = 0.5)+
+  facet_wrap(~voi) +
+  labs(x="Proportion of days missing") +
+  theme_minimal()+
+  ggtitle("B) Secondary inclusion criteria")
+```
+
+### Correlate subject-level missing rates with auxiliaries
+
+```{r corr-missing-aux-code}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+
+
+
+primary_voi_missing_binary<-all_obs_primary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = VOI]
+
+primary_voi_missing_binary<-cbind(all_obs_primary_week12[,.(PatientID,index)],primary_voi_missing_binary)
+
+
+
+secondary_voi_missing_binary<-all_obs_secondary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = VOI]
+secondary_voi_missing_binary<-cbind(all_obs_secondary_week12[,.(PatientID,index)],secondary_voi_missing_binary)
+
+
+
+
+primary_aux_missing_binary<-all_obs_primary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = auxilliary]
+primary_aux_missing_binary<-cbind(all_obs_primary_week12[,.(PatientID,index)],primary_aux_missing_binary)
+
+secondary_aux_missing_binary<-all_obs_secondary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = auxilliary]
+secondary_aux_missing_binary<-cbind(all_obs_secondary_week12[,.(PatientID,index)],secondary_aux_missing_binary)
+
+
+
+
+# join and correlate
+primary_missing_binary<-merge(primary_voi_missing_binary,primary_aux_missing_binary,by=c("PatientID","index"))
+
+secondary_missing_binary<-merge(secondary_voi_missing_binary,secondary_aux_missing_binary,by=c("PatientID","index"))
+
+
+
+```
+
+
+
+```{r results="asis"}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: tbl-corr-missing-aux-primary
+
+
+library(corrr)
+
+
+#Primary
+cor1<-correlate(primary_missing_binary[,.SD,.SDcols = c(VOI,auxilliary)]) |> focus(Albumin,ECOG,weight) 
+
+data.frame(cor1) |> 
+  gt() |> 
+  fmt_number(
+    decimals=3
+  ) |> 
+   tab_header(
+    title = md("A) Primary inclusion criteria")
+    # subtitle = md("`gtcars` is an R dataset")
+  ) |>
+  tab_caption(caption = md("Table XX. Correleation of variables of interests with all other VOI variables / auxiliary variables.")) |> 
+  as_raw_html() |> 
+  cat()
+
+```
+
+```{r results='asis'}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: tbl-corr-missing-aux-secondary
+
+
+#secondary
+
+cor2<-  
+correlate(secondary_missing_binary[,.SD,.SDcols = c(VOI,auxilliary)]) |> focus(Albumin,ECOG,weight)
+
+data.frame(cor2) |> 
+  gt() |> 
+  fmt_number(
+    decimals=3
+  )|> 
+   tab_header(
+    title = md("B) Secondary inclusion criteria")
+    # subtitle = md("`gtcars` is an R dataset")
+  ) |>
+  tab_caption(caption = md("Table XX. Correleation of variables of interests with all other VOI variables / auxiliary variables.")) |> 
+  as_raw_html() |> 
+  cat()
+
+
+
+```
+
+
+
+
+```{r fig.show="hold", out.width='49%',  fig.height=6}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| label: fig-pattern-missing
+#| fig-cap: Figure XX. Correlation plot for all lab values (plust ECOG and weight) to identify patterns of missing 
+
+
+
+#make a copy that doesn't have date and pateintID
+
+
+#convert to missing or not missing
+all_obs_primary_missing<-copy(all_obs_primary_week12)
+all_obs_primary_missing[,c("PatientID","Date","AdvancedDiagnosisDate","index"):=.(NULL)]
+all_obs_primary_missing<-all_obs_primary_missing[,lapply(.SD,function(x)ifelse(is.na(x),1,0))]
+
+
+all_obs_secondary_missing<-copy(all_obs_secondary_week12)
+all_obs_secondary_missing[,c("PatientID","Date","AdvancedDiagnosisDate","index"):=.(NULL)]
+all_obs_secondary_missing<-all_obs_secondary_missing[,lapply(.SD,function(x)ifelse(is.na(x),1,0))]
+
+
+#primary exclusion 
+DataExplorer::plot_correlation(all_obs_primary_missing,type="continuous", cor_args=list(use="pairwise.complete.obs"), title="A) Primary inclusion criteria") 
+
+#secondary exclusion
+DataExplorer::plot_correlation(all_obs_secondary_missing,type="continuous", cor_args=list(use="pairwise.complete.obs"), title="B) Primary inclusion criteria") 
+```
