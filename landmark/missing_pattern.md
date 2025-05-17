@@ -1,7 +1,7 @@
-Landmark Analysis - find out pattenrs of missing
+Landmark Analysis - find out patterns of missing
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Tue May 13, 2025 09:54:48 PM
+Sat May 17, 2025 04:05:11 PM
 
 - [1 Context](#1-context)
 - [2 Sketch](#2-sketch)
@@ -11,20 +11,32 @@ Tue May 13, 2025 09:54:48 PM
     subject](#41-missingness-proportion-per-subject)
     - [4.1.1 Correlate subject-level missing rates with
       auxiliaries](#411-correlate-subject-level-missing-rates-with-auxiliaries)
+- [5 Subset Calculation](#5-subset-calculation)
 
 # 1 Context
 
-I’ve run landmark analysis without imputing any data. But by doing so we
-lost so much samples. Thus, we should look into patterns of missing to
-check if we can impute or not. This idea is from the meeting I had with
-Ben and Tom on 2025/04/30
+I’ve run landmark analysis without imputing covariates (weight change,
+Albumin, ECOG scores). But by doing so we lost so many patients! Under
+the primary inclusion criteria, the sample size decreased from 24690 to
+3016, and under the secondary criteria, it decreased from 16397 to
+11309.
+
+Thus, here, we are trying to identify any auxiliary variables that may
+explain patterns of missingness in the covariates. If we can find any,
+then we could impute the covariates and re-do the landmark analysis with
+the imputed data.
+
+This idea is from the meeting I had with Ben and Tom on 2025/04/30.
+
+  
 
 # 2 Sketch
 
-Since we have longitudinal data set, we will look at pattern of missing
-in two levels:
+Let albumin, weight, and ECOG be variables of interest (VOIs). Since the
+VOIs are longitudinal in nature, we will explore pattenrwe have
+longitudinal data set, we will look at pattern of missing in two levels:
 
-1.  Across subjects (missingness over each visit), and
+1.  Across subjects (missingness over each day), and
 2.  Within subjects (missingness by person over time)
 
 For each lab values, the time interval of data collection was chosen
@@ -44,12 +56,60 @@ with advanced diagnosis date as the day 0:
 
 # 3 Population level missing
 
+For each VOI, we plot proportion of population missing each day.
+Proportion was calculated with denominator being the number of people
+alive on the given day.
+
 <div class="figure">
 
-<img src="missing_pattern_files/figure-gfm/fig-population-missing-1.png" alt="Plots of proportion missing for entire population" width="49%" /><img src="missing_pattern_files/figure-gfm/fig-population-missing-2.png" alt="Plots of proportion missing for entire population" width="49%" />
+<img src="missing_pattern_files/fig-population-missing-1.png" alt="Plots of proportion missing of VOIs for entire population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date." height="33%" /><img src="missing_pattern_files/fig-population-missing-2.png" alt="Plots of proportion missing of VOIs for entire population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date." height="33%" /><img src="missing_pattern_files/fig-population-missing-3.png" alt="Plots of proportion missing of VOIs for entire population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date." height="33%" />
 <p class="caption">
 <span id="fig:fig-population-missing"></span>Figure 3.1: Plots of
+proportion missing of VOIs for entire population. Proportion was
+calculated with denominator being the number of people alive on the
+given number of day since advnaced diagnosis date.
+</p>
+
+</div>
+
+Based on the above graphs, it looks like there are patterns of increased
+number of measurement every 7 days. I wondered if it’s the same patient
+who receives measurement every 7 days. So I looked into the data but
+that was not the case.
+
+  
+
+We present the same graphs but combined the three VOIs in a single
+single plot.
+
+<div class="figure">
+
+<img src="missing_pattern_files/fig-population-missing-comb-1.png" alt="Plots of proportion missing for entire population" width="49%" /><img src="missing_pattern_files/fig-population-missing-comb-2.png" alt="Plots of proportion missing for entire population" width="49%" />
+<p class="caption">
+<span id="fig:fig-population-missing-comb"></span>Figure 3.2: Plots of
 proportion missing for entire population
+</p>
+
+</div>
+
+  
+
+So… there seems to be some pattern over days. But the proportion of
+missing is too big. I’m not sure what I can use this information for.
+
+  
+
+I looked at the same graphs for all auxiliary variables, which is shown
+in Figure <a href="#fig:fig-population-aux">3.3</a>. Similar patterns
+are observed as in VOIs. But again, proportion missing is so large that
+I don’t know if this is worth any.
+
+<div class="figure">
+
+<img src="missing_pattern_files/fig-population-aux-1.png" alt="Proportion of missing observation of all auxiliary variables." width="100%" />
+<p class="caption">
+<span id="fig:fig-population-aux"></span>Figure 3.3: Proportion of
+missing observation of all auxiliary variables.
 </p>
 
 </div>
@@ -60,13 +120,12 @@ proportion missing for entire population
 
 ## 4.1 Missingness proportion per subject
 
-Again, we will restrict to week 12 before advanced diagnosis date even
-though we have up to 4 months and 1 year before the advanced diagnosis
-date for ECOG and weights.
+We will explore proportion of days of missing observation per each
+patient restricted to 12 weeks before the advanced diagnosis date.
 
 <div class="figure">
 
-<img src="missing_pattern_files/figure-gfm/fig-subject-level-missing-v1-1.png" alt="Figure XX. Plots of proportion missing" width="49%" /><img src="missing_pattern_files/figure-gfm/fig-subject-level-missing-v1-2.png" alt="Figure XX. Plots of proportion missing" width="49%" />
+<img src="missing_pattern_files/fig-subject-level-missing-v1-1.png" alt="Figure XX. Plots of proportion missing" width="49%" /><img src="missing_pattern_files/fig-subject-level-missing-v1-2.png" alt="Figure XX. Plots of proportion missing" width="49%" />
 <p class="caption">
 <span id="fig:fig-subject-level-missing-v1"></span>Figure 4.1: Figure
 XX. Plots of proportion missing
@@ -76,7 +135,7 @@ XX. Plots of proportion missing
 
 ### 4.1.1 Correlate subject-level missing rates with auxiliaries
 
-<div id="cnmknxdnpv"
+<div id="bpciqajekq"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -115,7 +174,7 @@ Alkaline
 0.959
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.409
+0.408
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.513
@@ -132,7 +191,7 @@ ALT
 0.407
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.508
+0.509
 </td>
 </tr>
 <tr style="border-style: none;">
@@ -160,7 +219,7 @@ Bilirubin
 0.402
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.501
+0.502
 </td>
 </tr>
 <tr style="border-style: none;">
@@ -196,7 +255,7 @@ Chloride
 Creatinine
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.816
+0.815
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.360
@@ -210,7 +269,7 @@ Creatinine
 Glucose
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.811
+0.810
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.349
@@ -227,7 +286,7 @@ Potassium
 0.696
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.288
+0.287
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.444
@@ -258,7 +317,7 @@ Sodium
 0.286
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.442
+0.443
 </td>
 </tr>
 <tr style="border-style: none;">
@@ -266,7 +325,7 @@ Sodium
 eGFR_mdrd
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.605
+0.604
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.286
@@ -283,7 +342,7 @@ eGFR_ckd_epi
 0.438
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.217
+0.218
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.263
@@ -336,7 +395,7 @@ Lymphocyte \#
 Neutrophil \#
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.637
+0.636
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.363
@@ -350,7 +409,7 @@ Neutrophil \#
 Platelet
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.711
+0.710
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.392
@@ -364,7 +423,7 @@ Platelet
 RBC
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.720
+0.719
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.399
@@ -378,7 +437,7 @@ RBC
 WBC
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.724
+0.723
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.400
@@ -392,7 +451,7 @@ WBC
 
 </div>
 
-<div id="ekcujkrhmh"
+<div id="rlyrxlsnfl"
 style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false" style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-family: system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3;" bgcolor="#FFFFFF">
@@ -445,7 +504,7 @@ ALT
 0.961
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.416
+0.417
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.521
@@ -462,7 +521,7 @@ AST
 0.418
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.525
+0.526
 </td>
 </tr>
 <tr style="border-style: none;">
@@ -515,7 +574,7 @@ Creatinine
 0.846
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.381
+0.380
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.521
@@ -582,10 +641,10 @@ Sodium
 eGFR_mdrd
 </td>
 <td headers="Albumin" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.622
+0.621
 </td>
 <td headers="ECOG" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
-0.293
+0.292
 </td>
 <td headers="weight" class="gt_row gt_right" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: right; font-variant-numeric: tabular-nums;" valign="middle" align="right">
 0.351
@@ -710,11 +769,52 @@ WBC
 
 <div class="figure">
 
-<img src="missing_pattern_files/figure-gfm/fig-pattern-missing-1.png" alt="Figure XX. Correlation plot for all lab values (plust ECOG and weight) to identify patterns of missing" width="49%" /><img src="missing_pattern_files/figure-gfm/fig-pattern-missing-2.png" alt="Figure XX. Correlation plot for all lab values (plust ECOG and weight) to identify patterns of missing" width="49%" />
+<img src="missing_pattern_files/fig-pattern-missing-1.png" alt="Figure XX. Correlation plot for all lab values (plust ECOG and weight) to identify patterns of missing" width="49%" /><img src="missing_pattern_files/fig-pattern-missing-2.png" alt="Figure XX. Correlation plot for all lab values (plust ECOG and weight) to identify patterns of missing" width="49%" />
 <p class="caption">
 <span id="fig:fig-pattern-missing"></span>Figure 4.2: Figure XX.
 Correlation plot for all lab values (plust ECOG and weight) to identify
 patterns of missing
+</p>
+
+</div>
+
+  
+
+  
+
+# 5 Subset Calculation
+
+In the entire population, it was hard to identify variables that are
+associated with each other because there were such high number of
+missing. Thus, we decided to subset the sample by applying all exclusion
+criteria we used in the landmark analysis until before excluding
+patients missing covariates. those who have test result out and have 1L
+therapy initiated within either 1 week or 4 weeks after the advanced
+diagnosis date, for primary and secondary inclusion criteria,
+respectively. The inclusion criteria are as follows:
+
+- did not receive valid test result until the day of advanced diagnosis
+- did not initiate 1L therapy before advanced diagnosis date
+- survived to 4 weeks
+- have received valid test result by 4 weeks
+
+With the inclusion criteria applied, we have total 27706 patients now in
+our subset for analysis.
+
+As we can see <a href="#fig:fig-population-missing-subset">5.1</a>
+(which is a same thing as Figure
+<a href="#fig:fig-population-missing">3.1</a>, but in q subset
+population), there too much missing so that the pattern doesn’t become
+any useful.
+
+<div class="figure">
+
+<img src="missing_pattern_files/fig-population-missing-subset-1.png" alt="Plots of proportion missing of VOIs on a subset of population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date." height="33%" /><img src="missing_pattern_files/fig-population-missing-subset-2.png" alt="Plots of proportion missing of VOIs on a subset of population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date." height="33%" /><img src="missing_pattern_files/fig-population-missing-subset-3.png" alt="Plots of proportion missing of VOIs on a subset of population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date." height="33%" />
+<p class="caption">
+<span id="fig:fig-population-missing-subset"></span>Figure 5.1: Plots of
+proportion missing of VOIs on a subset of population. Proportion was
+calculated with denominator being the number of people alive on the
+given number of day since advnaced diagnosis date.
 </p>
 
 </div>
