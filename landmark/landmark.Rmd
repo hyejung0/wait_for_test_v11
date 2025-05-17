@@ -24,8 +24,6 @@ output:
   #   number_sections: true
 # bibliography: references.bib
 # csl: nature.csl
-# execute:
-#   cache: true
 editor_options: 
   chunk_output_type: console
   markdown: 
@@ -36,6 +34,13 @@ editor_options:
 #| message: false
 #| warning: false
 
+knitr::opts_chunk$set(
+  cache = TRUE, 
+  cache.path = "landmark_cache/", # where to put your .rds files
+  warning = FALSE, 
+  message = FALSE, 
+  cache.lazy = FALSE,
+  verbose=TRUE)
 
 # knitr::knit_hooks$set(chunk = function(x, options) x) #for knitting word_document only
 # knitr::opts_knit$set(root.dir = "./SAP")
@@ -3288,7 +3293,6 @@ tbl_summary(
 ```
 
 
-Is this cross-reference working? \@ref(tab:tbl-secondary-target-investigate-copy).
 
 
 \
@@ -3559,11 +3563,11 @@ ptData1_wait_out_median_else<-ptData1_wait_out$median_survivals$yes_ipw$"cohort=
 
 
 
-Below is the 2 by 2 contingency table showing the 1L therapy type (Target or not) and whether the patient had targetable mutation by time zero (Table \@ref(tab:target-therapy-mutation-status-contingency-table-v2)). Based on the above contingency table, there are people who have targetable mutation but still got something else (N=586).:
+Below is the 2 by 2 contingency table showing the 1L therapy type (Target or not) and whether the patient had targetable mutation by time zero (Table \@ref(tab:tbl-target-therapy-mutation-status-contingency-table-v2)). Based on the above contingency table, there are people who have targetable mutation but still got something else (N=586).:
 
-Table: (\#tab:target-therapy-mutation-status-contingency-table-v2)  
-Contingency of X1 vs X2.
-```{r target-therapy-mutation-status-contingency-table-v2, results='asis'}
+\#tab:tbl-target-therapy-mutation-status-contingency-table-v2 
+2 by 2 contingency table for targetable mutation status and the respective treatment choices among the wait patients.
+```{r results='asis'}
 #| echo: false
 #| eval: true
 #| warning: false
@@ -3604,17 +3608,15 @@ cont_table[,table(`1L therapy type`,`Have targetable mutation by time zero` )]
 
 To check if receiving targetable therapy is really beneficial for survival, we show the KM plot by the type 1L therapy. The samples used in the KM plot is IPW adjusted samples.
 
-To build IPW, I thought it would be more appropriate to find the values around the time the person received 1L therapy (Among those who received 1L therapy). But among those who received 1L therapy, 8 people didn't have any record of ECOG between 2 months before and up to 1L therapy date and 77 people didn't have any albumin observed 6 weeks prior to and up to 1L theray date. So we decided to just drop all time-varying variables: ECOG, albumin, weight change. And we used demographic (fixed values) and whethe or not they had targetable mutation identified.  
+To build IPW, I thought it would be more appropriate to find the values around the time the person received 1L therapy. That means we need to exclude those who didn't receive 1L therapy so we did exclude them. But among those who received 1L therapy, 8 people didn't have any record of ECOG between 2 months before and up to 1L therapy date and 77 people didn't have any albumin observed 6 weeks prior to and up to 1L therapy date. So we decided to just drop all time-varying variables (ECOG, albumin, weight change). That is, we only used demographic (fixed values) and the binary targetable mutation variable. So this means that in the end, we included those who didn't receive 1L therapy as well.   
 
-With IPW, `r tmp1` reported high SMD, ranging from `r min(SMD_sw_report)` to `r max(SMD_sw_report)`. Thus, the covariate balance was really off. Below we present the table of covariate distribution before and after IPW.
+`r tmp1` reported high SMD, ranging from `r min(SMD_sw_report)` to `r max(SMD_sw_report)` in the IPW population (\@ref(tab:tbl-primary-wait-1L-dscriptive-both-v2)). Thus, IPW failed to generate pseudopopulations where the potential confounders are evenly distributed. 
 
-
-```{r tbl-primary-wait-1L-dscriptive-both-v2}
+```{r tbl-primary-wait-1L-dscriptive-both-v2,results='asis'}
 #| echo: false
 #| eval: true
 #| warning: false
 #| message: false
-#| tbl-cap: Summary of Patient Characteristics at Baseline.
 
 
 # build gt table
@@ -3642,13 +3644,15 @@ gt(ptData1_wait_out$SMD_table ) |>
   ) |> 
   # optional styling:
   opt_align_table_header("left") |> 
-  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline, without IPW weighting.")) |> 
-  as_raw_html()  #this will display the table on
+  tab_caption(caption = md("Table XX. Summary of Patient Characteristics at Baseline.")) |> 
+  as_raw_html() |>  #this will display the table on
+  cat()
 
 ```
 
 
-Nonetheless, we still show kalan meier curve for both before and after IPW. When we don't apply IPW, median survival (95% CI) of those who received targeted therapy was `r  ptData1_wait_out$median_survivals$no_ipw$"cohort=Target therapy"`, while those who didn't were  `r ptData1_wait_out$median_survivals$no_ipw$"cohort=something else"`.
+Nonetheless, we present KM plot for both IPW and no IPW population for exploration. 
+ When we don't apply IPW, median survival (95% CI) of those who received targeted therapy was `r  ptData1_wait_out$median_survivals$no_ipw$"cohort=Target therapy"`, while those who didn't were  `r ptData1_wait_out$median_survivals$no_ipw$"cohort=something else"`. When we apply the IPW, those who received targeted therapy was `r  ptData1_wait_out$median_survivals$yes_ipw$"cohort=Target therapy"`, while those who didn't were  `r ptData1_wait_out$median_survivals$yes_ipw$"cohort=something else"` (\@ref(fig:fig-primary-target-KM-v2)).
 
 
 
@@ -3680,12 +3684,12 @@ ptData1_wait_out$KM_curves$yes_ipw
 
 ## Aim 2 exclude variables without much observation
 
-**Q**: For the subgroup analysis where I performed subset analysis, I didn't report the result saying that there were IPW violation due to one cohort not having any observation for certain factor level for categorical variables. I also said that there are SMD much bigger than 1. However, some of them were because of just not having enough sample sizes. I am to re-do those analysis by excluding those variables or patients.   
+**Q**: In Aim 2, I repeated Aim 1 but in subgroups of population based on the the characteristics of interest. I didn't report the result of some subgroups saying that there were IPW violation due to one cohort not having any observation for certain factor level for categorical variables. I also said that there are SMD much bigger than 1. However, some of them were because of just not having enough sample sizes. I am to re-do those analysis by excluding those variables or patients.   
 
 
-**A**: The modification was applied directly to section {#aim-2}
+**A**: The modification was applied directly to section {#aim-2}. The resulting table is copied below (\@ref(tab"subgroup-tbl-copy)). Substantial difference was found in Asian subgroup with primary inclusion criteria. Interpretation is as follows. Among Asian patients who ddin't lose substantial weight (losing more than 10 lbs up to 6 months prior to time zero), waiting for test result decreased hazard of death on average by 71% (95% CI:19% - 89%). However, there Asians also have substantial SMD imbalance. The SMD table is shown in \@ref(tab:tbl-subgroup-refit-primary-SMD-asian). No wait cohort had more patietns who had normal range of Albumin. 
 
-```{r subgroup-tbl-copy}
+```{r subgroup-tbl-copy, results='asis'}
 #| eval: true
 
 
@@ -3760,739 +3764,50 @@ tmp |>
     ),
     placement = "right"
   )  |> 
-  as_raw_html()
+  as_raw_html() |> 
+  cat()
   
 
 ```
 
 
-## Find out patterns of missing for lab values
 
-**Q**: The exclusion tables \@ref{tab:tbl-exclusion_primary} and \@ref{tab:tbl-exclusion_secondary} show that we are losing more than half of the patient samples due to missing variables. This is a huge loss. Thus, we want to find ways to impute these values. Thus we decided look for patterns of missing.
 
-
-**A**: Since we have longitudinal data set, we will look at pattern of missing in two levels:
-
-1. Across subjects (missingness over each visit), and
-2. Within subjects (missingness by person over time)
-
-```{r pattern-missing-data}
-#| echo: false
-#| eval: false
-
-
-#generate data set for identifying patterns of missing
-#don't run it in the "knit" because I've already run and 
-#saved items as RDS file.
-
-#Read in the data 
-ptData_missing<-readRDS("../ptData_time0_diag_v2.rds")
-ptData_missing[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
-ptData_missing[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
-ptData_missing[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
-ptData_missing[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
-ptData_missing[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
-
-
-
-
-
-#Time 0 is 5th week
-ptData_missing[,time0:=NULL]
-ptData_missing[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4)+days(1))]
-
-
-#Now treatment assignment.
-ptData_missing[,cohort:="wait"]
-ptData_missing[advDiag_to_1L_week<advDiag_to_valid_test_week,cohort:="no_wait"]
-ptData_missing[,cohort:=factor(cohort,levels=c("wait","no_wait"), labels=c("wait","no_wait"))]
-
-
-#generate yearly count of advanced diagnosis date
-ptData_missing[,AdvancedDiagnosis_year:=year(AdvancedDiagnosisDate)]
-ptData_missing[,AdvancedDiagnosis_year_factor:=factor(AdvancedDiagnosis_year,levels = sort(unique(AdvancedDiagnosis_year), decreasing = F), labels = sort(unique(AdvancedDiagnosis_year), decreasing = F))]
-
-# ptData1[,min(AdvancedDiagnosis_year)] #2011
-ptData_missing[,AdvancedDiagnosis_year_rescale:=AdvancedDiagnosis_year-min(AdvancedDiagnosis_year)] #make first one 0.
-
-
-
-
-
-#Choose the variables that Wally had previously identified for me
-
-
-lab<-readRDS("../../labs/raw_lab.rds")
-vars<-readRDS("../../labs/baseline_covariates.rds")
-lab_vars<-unique(vars$variables)
-
-#Exclude carbon dioxide as it changes too frequently.
-lab_vars<-lab_vars[lab_vars!="Carbon dioxide"]
-
-
-
-
-lab_values_out<-
-lapply(lab_vars,function(this_vars){
-
-  #there can be several different baselines we want to use,
-  #choose only one here.
-  #set the character string that corresponds to the column name.
-  this.baseline<-"AdvancedDiagnosisDate"
-
-
-  #save the rows we want to use
-  this_Test<-vars[variables==this_vars,unique(Test)]
-
-  #Save the subdat
-  temp<-lab[Test %in% this_Test,]
-
-  #remove all invalid dataset
-  temp<-temp[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
-
-
-  #subset the data to what we need.
-  these.cols<-c("PatientID",this.baseline)
-  temp<-merge.data.table(ptData_missing[,..these.cols],
-                         temp[,.(PatientID,TestDate,TestUnitsCleaned,TestResultCleaned)],
-                         by="PatientID",
-                         all.x=TRUE,
-                         allow.cartesian=TRUE)
-
-  setnames(temp, this.baseline,"time0")
-  ### Entry Criteria - start ###
-  #For baseline value, time windows are:
-  #(-12 weeks,4 weeks]
-  #(-12 weeks,1 week]
-
-  #generate two
-  baseline_dat<-copy(temp)
-  baseline_dat[,min_date:=as.IDate(as.Date(time0)- weeks(12))]
-
-  #two different cut off for the baseline
-  #Up to 4 weeks after
-  #Up to 1 week after
-  #Baseline up to 1 week after:
-  bdat1<-copy(baseline_dat)
-  bdat1[,max_date:=as.IDate(as.Date(time0)+ weeks(1))]
-
-  #Baseline up to 4 weeks after:
-  bdat4<-copy(baseline_dat)
-  bdat4[,max_date:=as.IDate(as.Date(time0)+ weeks(4))]
-
-  #Save them as a list
-  baseline_dat_list<-list(
-    "week1"=bdat1,
-    "week4"=bdat4
-  )
-
-  baseline_dat_list<-
-    lapply(baseline_dat_list,function(baseline_dat){
-      #Extract only those that are within this time frame
-      baseline_dat<-baseline_dat[min_date<=TestDate & max_date>=TestDate,]
-      baseline_dat<-baseline_dat[,days_to_time0:=time0-TestDate]
-      baseline_dat
-    })
-
-baseline_dat_list
-})
-names(lab_values_out)<-lab_vars
-
-#ECOG
-baselineECOG<-readRDS("../../../Data/BaselineECOG.rds")
-baselineECOG<-baselineECOG[PatientID %in% ptData_missing$PatientID,]
-baselineECOG[ECOGValue=="Unknown",ECOGValue:=NA]
-baselineECOG[,ECOGValue:=as.integer(ECOGValue)]
-setnames(baselineECOG,"ECOGValue","EcogValue")
-setnames(baselineECOG,"ECOGDate","Date")
-baselineECOG[,Date:=as.IDate(Date)]
-
-
-ECOG<-readRDS("../../../Data/ECOG.rds")
-ECOG<-ECOG[PatientID %in% ptData_missing$PatientID,]
-setnames(ECOG,"EcogDate","Date")
-ECOG<-unique(ECOG[,.(PatientID,Date,EcogValue)])
-ECOG[,N:=.N,by=.(PatientID,Date)]
-ECOG[N>1,] #We will take average
-ECOG2<-ECOG[,mean(as.numeric(EcogValue),na.rm=T),by=.(PatientID,Date)]
-ECOG2
-setnames(ECOG2,"V1","EcogValue")
-
-#get them merged
-both_ECOG<-
-  merge(unique(baselineECOG[,.(PatientID,Date,EcogValue)]),
-        ECOG2[,.(PatientID,Date,EcogValue)],
-        by=c("PatientID","Date"),
-        all=T)
-both_ECOG[,EcogValue.x:=as.numeric(EcogValue.x)]
-both_ECOG[is.na(EcogValue.x),EcogValue.x:=EcogValue.y]
-both_ECOG[,EcogValue.y:=NULL]
-setnames(both_ECOG,"EcogValue.x","EcogValue")
-rm(list=c("baselineECOG","ECOG"))
-both_ECOG
-#Average if more than 1 observed
-# both_ECOG<-both_ECOG[,mean(EcogValue, na.rm=T),by=.(PatientID,Date)]
-
-temp<-merge.data.table(ptData_missing[,.(PatientID,AdvancedDiagnosisDate)],
-                         both_ECOG,
-                         by="PatientID",
-                         all.x=TRUE,
-                         allow.cartesian=TRUE)
-
-
- ### Entry Criteria - start ###
-  #For baseline value, time windows are:
-  #(-2 months,4 weeks]
-  #(-2 months,1 week]
-
-  #generate two
-  ECOG_tmp<-copy(temp)
-  ECOG_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(2))]
-
-  #two different cut off for the baseline
-  #Up to 4 weeks after
-  #Up to 1 week after
-  #Baseline up to 1 week after:
-  bdat1<-copy(ECOG_tmp)
-  bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(1))]
-
-  #Baseline up to 4 weeks after:
-  bdat4<-copy(ECOG_tmp)
-  bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(4))]
-
-  #Save them as a list
-  baseline_dat_list<-list(
-    "week1"=bdat1,
-    "week4"=bdat4
-  )
-
-  baseline_dat_list<-
-    lapply(baseline_dat_list,function(baseline_dat){
-      #Extract only those that are within this time frame
-      baseline_dat<-baseline_dat[min_date<=Date & max_date>=Date,]
-      baseline_dat<-baseline_dat[,days_to_time0:=AdvancedDiagnosisDate-Date]
-      baseline_dat
-    })
-ECOG<-copy(baseline_dat_list)
-
-
-
-#Weight change
-
-
-#Get baseline weight
-vital<-readRDS("../../../Data/Vitals.rds")
-vital<-vital[PatientID %in% ptData_missing$PatientID,]
-
-#How many people have weight?
-count_weight<-vital[,sum(Test=="body weight"),by=PatientID]
-count_weight[,sum(V1==0)]
-#224 people have 0 weight. very small number of people. Good.
-weight<-vital[Test=="body weight",]
-
-#Want to use kg
-#Is there any missing?
-weight[is.na(TestResult) & !is.na(TestResultCleaned),.N]
-weight[!is.na(TestResult) & is.na(TestResultCleaned),.N]
-weight[!is.na(TestResult) & is.na(TestResultCleaned),]
-weight[!is.na(TestResult) & is.na(TestResultCleaned),.(TestResult,TestUnits,TestResultCleaned,TestUnitsCleaned)]
-#All of TestResult are missing units.
-#Just use TestResultCleaned.
-
-
-#remove all invalid dataset
-temp<-weight[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
-temp<-temp[,mean(TestResultCleaned,na.rm=T),by=.(PatientID,TestDate)] #average out if we have more than one observed.
-setnames(temp,"V1","TestResultCleaned")
-#subset the data to what we need.
-temp<-merge.data.table(ptData_missing[,.(PatientID,AdvancedDiagnosisDate)],
-                       temp[,.(PatientID,TestDate,TestResultCleaned)],
-                       by="PatientID",
-                       all.x=TRUE,
-                       allow.cartesian=TRUE)
-
-#6 months prior to 1 week or 4 weeks after.
-weight_tmp<-copy(temp)
-weight_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(6))]
-
-#two different cut off for the baseline
-#Up to 4 weeks after
-#Up to 1 week after
-#Baseline up to 1 week after:
-bdat1<-copy(weight_tmp)
-bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(1))]
-
-#Baseline up to 4 weeks after:
-bdat4<-copy(weight_tmp)
-bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(4))]
-
-#Save them as a list
-baseline_dat_list<-list(
-    "week1"=bdat1,
-    "week4"=bdat4
-  )
-
-baseline_dat_list<-
-    lapply(baseline_dat_list,function(baseline_dat){
-      #Extract only those that are within this time frame
-      baseline_dat<-baseline_dat[min_date<=TestDate & max_date>=TestDate,]
-      baseline_dat<-baseline_dat[,days_to_time0:=AdvancedDiagnosisDate-TestDate]
-      baseline_dat
-    })
-Weight<-copy(baseline_dat_list)
-#Average out if more than one is observed.
-
-
-rm(baseline_dat_list)
-rm(weight_tmp)
-rm(ECOG_tmp)
-
-
-#For each variable, store 12 weeks observation be fore advanced diagnosis date
-#and 1 week or 4 weeks after.
-all_obs<-ptData_missing[,.(PatientID,AdvancedDiagnosisDate)]
-all_obs[,week_12:=as.IDate(as.Date(AdvancedDiagnosisDate)-weeks(12))]
-all_obs[,week_plus_1:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(1))]
-all_obs[,week_plus_4:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4))]
-
-
-#For primary inclusion criteria, we should expand up to 1 week after
-all_obs_primary<-all_obs[ , .(
-  Date = seq(week_12, week_plus_1, by = "days"),
-  time0     = AdvancedDiagnosisDate          # propagate time0 into each new row
-),
-by = PatientID
-]
-
-all_obs_secondary<-all_obs[ , .(
-  Date = seq(week_12, week_plus_4, by = "days"),
-  time0     = AdvancedDiagnosisDate          # propagate time0 into each new row
-),
-by = PatientID
-]
-
-
-#Merge the values
-for(i in 1:length(lab_values_out)){
-  print(lab_vars[i])
-  #Some lab values have duplicate. Take mean.
-  this_lab<-lab_values_out[[i]]$week1[,.(PatientID,TestDate,TestResultCleaned)]
-  this_lab<-this_lab[,mean(TestResultCleaned,na.rm=T),by=.(PatientID,TestDate)]
-  setnames(this_lab,"V1","TestResultCleaned")
-
-  all_obs_primary<-
-  merge(all_obs_primary,
-        this_lab,
-        by.x=c("PatientID","Date"),
-        by.y=c("PatientID","TestDate"),
-        all.x=T
-        )
-  setnames(all_obs_primary,"TestResultCleaned",lab_vars[i])
-
-
-
-
-  this_lab<-lab_values_out[[i]]$week4[,.(PatientID,TestDate,TestResultCleaned)]
-  this_lab<-this_lab[,mean(TestResultCleaned,na.rm=T),by=.(PatientID,TestDate)]
-  setnames(this_lab,"V1","TestResultCleaned")
-
-  all_obs_secondary<-
-  merge(all_obs_secondary,
-        this_lab,
-        by.x=c("PatientID","Date"),
-        by.y=c("PatientID","TestDate"),
-        all.x=T
-        )
-  setnames(all_obs_secondary,"TestResultCleaned",lab_vars[i])
-}
-
-#Merge ecog
-all_obs_primary<-
-  merge(all_obs_primary,
-        ECOG$week1[,.(PatientID,Date,EcogValue)],
-        by=c("PatientID","Date"),
-        all.x=T
-        )
-setnames(all_obs_primary,"EcogValue","ECOG")
-all_obs_secondary<-
-  merge(all_obs_secondary,
-        ECOG$week4[,.(PatientID,Date,EcogValue)],
-        by=c("PatientID","Date"),
-        all.x=T
-        )
-setnames(all_obs_secondary,"EcogValue","ECOG")
-
-#Log Weight
-all_obs_primary<-
-  merge(all_obs_primary,
-        Weight$week1[,.(PatientID,TestDate,TestResultCleaned)],
-        by.x=c("PatientID","Date"),
-        by.y=c("PatientID","TestDate"),
-        all.x=T
-        )
-setnames(all_obs_primary,"TestResultCleaned","weight")
-
-all_obs_secondary<-
-  merge(all_obs_secondary,
-        Weight$week4[,.(PatientID,TestDate,TestResultCleaned)],
-        by.x=c("PatientID","Date"),
-        by.y=c("PatientID","TestDate"),
-        all.x=T
-        )
-setnames(all_obs_secondary,"TestResultCleaned","weight")
-
-
-saveRDS(all_obs_primary,"all_obs_primary.rds")
-saveRDS(all_obs_secondary,"all_obs_secondary.rds")
-
-
-
-```
-
-
-```{r pattern-missing-data-readin}
-#| echo: false
-#| eval: true
-
-
-
-#Read in the data set for exploring missingness
-
-all_obs_primary<-readRDS("all_obs_primary.rds")
-all_obs_secondary<-readRDS("all_obs_secondary.rds")
-
-all_obs_primary_missing<-copy(all_obs_primary)
-all_obs_primary_missing[,c("PatientID","Date","time0"):=.(NULL)]
-
-all_obs_secondary_missing<-copy(all_obs_secondary)
-all_obs_secondary_missing[,c("PatientID","Date","time0"):=.(NULL)]
-
-
-
-#get variables of interest (VOI)
-VOI<-c(
- "Albumin",
- "ECOG",
- "weight"
-)
-
-#get auxilliary variables (includes VOI)
-auxilliary<-colnames(all_obs_primary)[!colnames(all_obs_primary) %in%c("PatientID","Date","time0",VOI)]
-
-
-
-
-
-
-#Build dataset for one patient
-count_observed<-all_obs_primary[,sum(!is.na(.SD)),by=PatientID,.SDcols=c(VOI,auxilliary)]
-count_observed<-count_observed[order(V1,decreasing = T),]  
-count_observed[1,] #FC85B4F31A510
-#FC85B4F31A510 has the largest number of observation.
-#Save this person to work with.
-one_obs_primary<-all_obs_primary[PatientID=="FC85B4F31A510",.SD,.SDcols=c(VOI,auxilliary)]
-
-
-
-count_observed<-all_obs_secondary[,sum(!is.na(.SD)),by=PatientID,.SDcols=c(VOI,auxilliary)]
-count_observed<-count_observed[order(V1,decreasing = T),]  
-count_observed[1,] #F94D0B13A35B4
-#F94D0B13A35B4 has the largest number of observation.
-#Save this person to work with.
-one_obs_secondary<-all_obs_secondary[PatientID=="F94D0B13A35B4",.SD,.SDcols=c(VOI,auxilliary)]
-
-
-
-```
-
-
-\
-
-### Population level missing
-
-
-```{r fig.show="hold", out.width='49%',  fig.height=6}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: fig-population-missing
-#| fig-cap: Figure XX. Plots of proportion missing
-
-
-
-# install.packages(c("naniar", "VIM", "mice"))
-library(naniar)    # very nice ggplot‐based missing‐data plots
-library(VIM)       # classic aggr() plots
-library(mice)      # md.pattern()
-
-
-#We have total 92 days (- 12 weeks , 1 week) for primary
-#let's calculate proportion missing for each day of these weeks for 
-#each pvariable.
-
-all_obs_primary[,index:=1:.N,by=PatientID]
-all_obs_primary_long<-
-melt(all_obs_primary,id.vars = c("PatientID","index"),measure.vars=c(VOI,auxilliary), variable.name = "var", value.name = "val")
-
-population_summary_primary<-all_obs_primary_long[,mean(is.na(val)),by=.(index,var)]
-setnames(population_summary_primary,"V1","pct_miss")
-
-ggplot(population_summary_primary[var %in% VOI,],
-       aes(x=index, y=pct_miss, color=var)) +
-  geom_line() +
-  labs(y="Percent missing", x="Day number") +
-  theme_minimal()+
-  ggtitle("B) Primary inclusion criteria")
-
-
-
-
-#We have total 113 days (- 12 weeks , 4 week) for primary
-#let's calculate proportion missing for each day of these weeks for 
-#each pvariable.
-
-all_obs_secondary[,index:=1:.N,by=PatientID]
-all_obs_secondary_long<-
-  melt(all_obs_secondary,id.vars = c("PatientID","index"),measure.vars=c(VOI,auxilliary), variable.name = "var", value.name = "val")
-
-population_summary_secondary<-all_obs_secondary_long[,mean(is.na(val)),by=.(index,var)]
-setnames(population_summary_secondary,"V1","pct_miss")
-
-
-ggplot(population_summary_secondary[var %in% VOI,],
-       aes(x=index, y=pct_miss, color=var)) +
-  geom_line() +
-  labs(y="Percent missing", x="Day number") +
-  theme_minimal()+
-  ggtitle("B) Secondary inclusion criteria")
-
-```
-
-
-
-
-\
-
-### Subject-level summaries
-
-
-#### Missingness proportion per subject
-
-```{r fig.show="hold", out.width='49%',  fig.height=6}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: fig-subject-level-missing-v1
-#| fig-cap: Figure XX. Plots of proportion missing
-
-
-
-sub_level_missing_primary1<-all_obs_primary[,lapply(.SD,function(x)mean(is.na(x))),.SDcols = VOI,by=PatientID]
-
-sub_level_missing_secondary1<-all_obs_secondary[,lapply(.SD,function(x)mean(is.na(x))),.SDcols = VOI,by=PatientID]
-
-sub_level_missing_primary1<-
-melt(sub_level_missing_primary1,
-     id.vars="PatientID",
-     measure.vars = VOI,
-     variable.name = "voi",
-     value.name = "rate")
-
-sub_level_missing_secondary1<-
-melt(sub_level_missing_secondary1,
-     id.vars="PatientID",
-     measure.vars = VOI,
-     variable.name = "voi",
-     value.name = "rate")
-
-
-ggplot(sub_level_missing_primary1, mapping = aes(x=rate))+
-    geom_histogram(bins=30) +
-  # geom_histogram(stat="density") +
-  # geom_area(stat = "density", adjust = 0.5)+
-  facet_wrap(~voi) +
-  labs(x="Proportion of days missing") +
-  theme_minimal()+
-  ggtitle("A) Primary inclusion criteria")
-
-
-
-ggplot(sub_level_missing_secondary1, mapping = aes(x=rate))+
-    geom_histogram(bins=30) +
-  # geom_histogram(stat="density") +
-  # geom_area(stat = "density", adjust = 0.5)+
-  facet_wrap(~voi) +
-  labs(x="Proportion of days missing") +
-  theme_minimal()+
-  ggtitle("B) Secondary inclusion criteria")
-```
-
-
-
-
-#### Correlate subject-level missing rates with auxiliaries
-
-```{r corr-missing-aux-code}
+```{r tbl-subgroup-refit-primary-SMD-asian,results='asis'}
 #| echo: false
 #| eval: true
 #| warning: false
 #| message: false
 
 
-primary_voi_missing_binary<-all_obs_primary[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = VOI]
-primary_voi_missing_binary<-cbind(all_obs_primary[,.(PatientID,index)],primary_voi_missing_binary)
-
-secondary_voi_missing_binary<-all_obs_secondary[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = VOI]
-secondary_voi_missing_binary<-cbind(all_obs_secondary[,.(PatientID,index)],secondary_voi_missing_binary)
-
-
-
-primary_aux_missing_binary<-all_obs_primary[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = auxilliary]
-primary_aux_missing_binary<-cbind(all_obs_primary[,.(PatientID,index)],primary_aux_missing_binary)
-
-secondary_aux_missing_binary<-all_obs_secondary[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = auxilliary]
-secondary_aux_missing_binary<-cbind(all_obs_secondary[,.(PatientID,index)],secondary_aux_missing_binary)
-
-
-# join and correlate
-primary_missing_binary<-merge(primary_voi_missing_binary,primary_aux_missing_binary,by=c("PatientID","index"))
-
-secondary_missing_binary<-merge(secondary_voi_missing_binary,secondary_aux_missing_binary,by=c("PatientID","index"))
-
-```
-
-
-
-```{r}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: tbl-corr-missing-aux-primary
-
-
-library(corrr)
-
-
-#Primary
-cor1<-correlate(primary_missing_binary[,.SD,.SDcols = c(VOI,auxilliary)]) |> focus(Albumin,ECOG,weight) 
-
-data.frame(cor1) |> 
-  gt() |> 
-   tab_header(
-    title = md("A) Primary inclusion criteria")
-    # subtitle = md("`gtcars` is an R dataset")
-  ) |>
-  tab_caption(caption = md("Table XX. Correleation of variables of interests with all other VOI variables / auxiliary variables.")) |> 
-  as_raw_html() 
+# build gt table
+gt(subgroup_analyses_primary$Asian$SMD_table ) |> 
+  # First two columns stay as-is:
+  cols_label(
+    this.rownames = "Variable",
+    level         = "Level",
+    # now override the 6 numeric columns’ *display* labels:
+    `wait`  = "Wait",
+    `no_wait`    = "No wait",
+    SMD        = "SMD",
+    `wait_sw`  = "Wait",
+    `no_wait_sw`    = "No wait",
+    SMD_sw     = "SMD"
+  ) |> 
+  # create the two spanners:
+  tab_spanner(
+    label   = "No IPW",
+    columns = c(wait , no_wait, SMD)
+  ) |> 
+  tab_spanner(
+    label   = "IPW",
+    columns = c(wait_sw , no_wait_sw, SMD_sw)
+  ) |> 
+  # optional styling:
+  opt_align_table_header("left") |> 
+  tab_caption(caption = md("Table XX. Summary of Asian Patients' Characteristics at Baseline.")) |> 
+  as_raw_html() |>  #this will display the table on
+  cat()
 
 ```
 
-```{r}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: tbl-corr-missing-aux-secondary
-
-
-#secondary
-
-cor2<-  
-correlate(secondary_missing_binary[,.SD,.SDcols = c(VOI,auxilliary)]) |> focus(Albumin,ECOG,weight)
-
-data.frame(cor2) |> 
-  gt() |> 
-   tab_header(
-    title = md("B) Secondary inclusion criteria")
-    # subtitle = md("`gtcars` is an R dataset")
-  ) |>
-  tab_caption(caption = md("Table XX. Correleation of variables of interests with all other VOI variables / auxiliary variables.")) |> 
-  as_raw_html() 
-
-
-
-```
-\
-
-### Numeric check: point-biserial correlations
-
-You can turn each VOI’s missingness into a 0/1 indicator, then compute correlations with each auxiliary.
-
-Interpretation: values near zero suggest the VOI is missing at random w.r.t. that auxiliary; large positive/negative values indicate a relationship you may want to account for in the imputation model.
-
-```{r numeric-check-missing}
-#| echo: false
-#| eval: false
-#| warning: false
-#| message: false
-
-library(dplyr)
-
-# 2a) Define your VOIs
-VOIs   <- c("Y1","Y2","Y3")
-aux    <- setdiff(names(df), VOIs)
-
-# 2b) Create NA‐indicators
-df2 <- df %>%
-  mutate(across(
-    all_of(VOIs),
-    ~ as.integer(is.na(.x)),
-    .names = "{.col}_NA"       # yields Y1_NA, Y2_NA, Y3_NA
-  ))
-
-NA_inds <- paste0(VOIs, "_NA")
-
-# 2c) Compute the correlation matrix
-M <- cor(
-  df2 %>% select(all_of(c(NA_inds, aux))),
-  use = "pairwise.complete.obs"
-)
-
-# 2d) Extract just the VOI‐NA vs auxiliary block
-M[NA_inds, aux]  # a 3×17 matrix of point‐biserial correlations
-
-```
-
-
-
-\
-
-### A more formal check: logistic regression
-
-A small logistic model can flag which auxiliaries are significant predictors of missingness:
-
-
-```{r fig.show="hold", out.width='49%',  fig.height=6}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: fig-pattern-missing
-#| fig-cap: Figure XX. Correlation plot for all lab values (plust ECOG and weight) to identify patterns of missing 
-
-
-all_obs_primary<-readRDS("all_obs_primary.rds")
-all_obs_secondary<-readRDS("all_obs_secondary.rds")
-
-
-
-#convert to missing or not missing
-all_obs_primary_missing<-copy(all_obs_primary)
-all_obs_primary_missing[,c("PatientID","Date","time0"):=.(NULL)]
-all_obs_primary_missing<-all_obs_primary_missing[,lapply(.SD,function(x)ifelse(is.na(x),1,0))]
-
-
-all_obs_secondary_missing<-copy(all_obs_secondary)
-all_obs_secondary_missing[,c("PatientID","Date","time0"):=.(NULL)]
-all_obs_secondary_missing<-all_obs_secondary_missing[,lapply(.SD,function(x)ifelse(is.na(x),1,0))]
-
-
-#primary exclusion 
-DataExplorer::plot_correlation(all_obs_primary_missing,type="continuous", cor_args=list(use="pairwise.complete.obs"), title="A) Primary inclusion criteria") 
-
-#secondary exclusion
-DataExplorer::plot_correlation(all_obs_secondary_missing,type="continuous", cor_args=list(use="pairwise.complete.obs"), title="B) Primary inclusion criteria") 
-```
