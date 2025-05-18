@@ -3565,45 +3565,60 @@ ptData1_wait_out_median_else<-ptData1_wait_out$median_survivals$yes_ipw$"cohort=
 
 Below is the 2 by 2 contingency table showing the 1L therapy type (Target or not) and whether the patient had targetable mutation by time zero (Table \@ref(tab:tbl-target-therapy-mutation-status-contingency-table-v2)). Based on the above contingency table, there are people who have targetable mutation but still got something else (N=586).:
 
-\#tab:tbl-target-therapy-mutation-status-contingency-table-v2 
-2 by 2 contingency table for targetable mutation status and the respective treatment choices among the wait patients.
-```{r results='asis'}
+
+```{r }
+#| echo: false
+#| eval: true
+#| include: false
+#| warning: false
+#| message: false
+
+cont_table<-ptData1_wait[,.(cohort,targetable_mutation_by_week_4)]
+cont_table[,Have_targetable_mutation_by_week_4:=as.character(NA)]
+cont_table[targetable_mutation_by_week_4==TRUE,Have_targetable_mutation_by_week_4:="Yes"]
+cont_table[targetable_mutation_by_week_4==FALSE,Have_targetable_mutation_by_week_4:="No"]
+cont_table[,targetable_mutation_by_week_4:=NULL]
+
+before<-svydesign(ids= ~ 0, data=cont_table) 
+before_tab<- svyCreateTableOne(vars="Have_targetable_mutation_by_week_4", strata = "cohort",data = before, test = FALSE)
+
+```
+
+
+```{r }
 #| echo: false
 #| eval: true
 #| warning: false
 #| message: false
-#| tbl-cap: 2 by 2 contingency table for targetable mutation status and the respective treatment choices among the wait patients.
+#| label: tbl-target-therapy-mutation-status-contingency-table-v2
 
 
-cont_table<-ptData1_wait[,.(cohort,targetable_mutation_by_week_4)]
-cont_table[,targetable_mutation_by_week_4_characer:=as.character(NA)]
-cont_table[targetable_mutation_by_week_4==TRUE,targetable_mutation_by_week_4_characer:="Yes"]
-cont_table[targetable_mutation_by_week_4==FALSE,targetable_mutation_by_week_4_characer:="No"]
-cont_table[,targetable_mutation_by_week_4:=NULL]
-setnames(
-  cont_table,
-  old=c("cohort","targetable_mutation_by_week_4_characer"),
-  new=c("1L therapy type","Have targetable mutation by time zero")
+
+# before_tab %>%
+#   as_kable(
+#     caption ="2 by 2 contingency table for targetable mutation status and the respective treatment choices among the wait patients. Even those who didn't receive any 1L therapy is included in the table, in the 'something else' group."
+#   )
+
+# 1. run print() but swallow its console output
+invisible(
+  capture.output(
+    before_tab2 <- print(
+      before_tab,
+      showAllLevels = TRUE,
+      smd            = TRUE
+    )
+  )
 )
 
-
-cont_table[,table(`1L therapy type`,`Have targetable mutation by time zero` )]
-
-# cont_table<-cont_table[,.N,by=.(`1L therapy type`,`Have targetable mutation by time zero`)]
-# cont_table<-dcast(cont_table,`1L therapy type`~`Have targetable mutation by time zero`,value.var = "N")
-# 
+# 2. now before_tab2 is the object you want to tabulate
+knitr::kable(
+  before_tab2,
+  caption = "2 by 2 contingency table for targetable mutation status and the respective treatment choices among the wait patients. Even those who didn't receive any 1L therapy is included in the table, in the 'something else' group.")
 
 
-# cont_table %>% 
-#   rename("\t" = `1L therapy type`) %>% 
-#   add_column(" " = c("1L therapy type", rep(" ", nrow(.) - 1)), .before = "\t") %>% 
-#   kable() %>% 
-#   kable_styling(position = "left", full_width = F, ) %>% 
-#   add_header_above(c("", "", "Have targetable mutation by time zero", rep(" ", ncol(cont_table) - 2))) %>% 
-#   column_spec(1:2, bold = TRUE) 
+
 
 ```
-
 
 
 To check if receiving targetable therapy is really beneficial for survival, we show the KM plot by the type 1L therapy. The samples used in the KM plot is IPW adjusted samples.

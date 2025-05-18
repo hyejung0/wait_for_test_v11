@@ -1,7 +1,7 @@
 Landmark Analysis
 ================
 Hyejung Lee <hyejung.lee@utah.edu>
-Sat May 17, 2025 04:15:43 PM
+Sat May 17, 2025 06:48:22 PM
 
 - [1 Context](#1-context)
 - [2 Research Aims](#2-research-aims)
@@ -3471,15 +3471,21 @@ patient has targetable mutation at time zero.
 Below is the 2 by 2 contingency table showing the 1L therapy type
 (Target or not) and whether the patient had targetable mutation by time
 zero (Table
-<a href="#tab:tbl-target-therapy-mutation-status-contingency-table-v2"><strong>??</strong></a>).
+<a href="#tab:tbl-target-therapy-mutation-status-contingency-table-v2">8.2</a>).
 Based on the above contingency table, there are people who have
 targetable mutation but still got something else (N=586).:
 
-\#tab:tbl-target-therapy-mutation-status-contingency-table-v2 2 by 2
-contingency table for targetable mutation status and the respective
-treatment choices among the wait patients. Have targetable mutation by
-time zero 1L therapy type No Yes something else 1691 586 Target therapy
-25 239
+|  | level | something else | Target therapy | SMD |
+|----|:---|:---|:---|:---|
+| n |  | 2277.0 | 264.0 |  |
+| Have_targetable_mutation_by_week_4 (%) | No | 1691.0 (74.3) | 25.0 ( 9.5) | 1.742 |
+|  | Yes | 586.0 (25.7) | 239.0 (90.5) |  |
+
+<span id="tab:tbl-target-therapy-mutation-status-contingency-table-v2"></span>Table
+8.2: 2 by 2 contingency table for targetable mutation status and the
+respective treatment choices among the wait patients. Even those who
+didn’t receive any 1L therapy is included in the table, in the
+‘something else’ group.
 
 To check if receiving targetable therapy is really beneficial for
 survival, we show the KM plot by the type 1L therapy. The samples used
@@ -3499,7 +3505,7 @@ in the end, we included those who didn’t receive 1L therapy as well.
 Histology, Race/Ethnicity, Approximate age at Advanced Diagnosis, and
 Targetable mutation reported high SMD, ranging from 0.141 to 0.361 in
 the IPW population
-(<a href="#tab:tbl-primary-wait-1L-dscriptive-both-v2">8.2</a>). Thus,
+(<a href="#tab:tbl-primary-wait-1L-dscriptive-both-v2">8.3</a>). Thus,
 IPW failed to generate pseudopopulations where the potential confounders
 are evenly distributed.
 
@@ -3992,7 +3998,7 @@ who ddin’t lose substantial weight (losing more than 10 lbs up to 6
 months prior to time zero), waiting for test result decreased hazard of
 death on average by 71% (95% CI:19% - 89%). However, there Asians also
 have substantial SMD imbalance. The SMD table is shown in
-<a href="#tab:tbl-subgroup-refit-primary-SMD-asian">8.3</a>. No wait
+<a href="#tab:tbl-subgroup-refit-primary-SMD-asian">8.4</a>. No wait
 cohort had more patietns who had normal range of Albumin.
 
 <div id="hrnlygldoz"
