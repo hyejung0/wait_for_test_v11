@@ -5,19 +5,20 @@ author: "Hyejung Lee <hyejung.lee@utah.edu>"
 date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
 always_allow_html: true
 output:
-  bookdown::github_document2:
-    toc: true
-    toc_depth: 4
-    html_preview: true
-  # bookdown::html_document2:
-  #   self-contained: true
-  #   embed-resources: true
-  #   code-fold: true
+  # bookdown::github_document2:
   #   toc: true
   #   toc_depth: 4
-  #   theme: united
-  #   toc_float: true
-  #   number-sections: true
+  #   html_preview: true
+  bookdown::html_document2:
+    keep_md: true
+    self-contained: true
+    embed-resources: true
+    code-fold: true
+    toc: true
+    toc_depth: 4
+    theme: united
+    toc_float: true
+    number-sections: true
   # word_document:
   #   toc: true
   #   toc_depth: 3
@@ -43,6 +44,7 @@ knitr::opts_chunk$set(
 
 # remotes::install_github('yihui/knitr')
 # library(knitr)
+library(VIM)
 library(ggplot2)
 library(grid)
 library(gridExtra)
@@ -97,8 +99,8 @@ ptData_missing[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,St
 
 #Time 0 is 5th week
 ptData_missing[,time0:=NULL]
-ptData_missing[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4)+days(1))]
-
+ptData_missing[,time0:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4))]
+ptData_missing[,.(AdvancedDiagnosisDate,time0)]
 
 #Now treatment assignment.
 ptData_missing[,cohort:="wait"]
@@ -162,21 +164,24 @@ lapply(lab_vars,function(this_vars){
   #For baseline value, time windows are:
   #(-12 weeks,4 weeks]
   #(-12 weeks,1 week]
+  #We will keep 7 days in a week. 
+  #But we will also week 30 days a month. 
+  #12*7 = 84 days 
 
   #generate two
   baseline_dat<-copy(temp)
-  baseline_dat[,min_date:=as.IDate(as.Date(time0)- weeks(12))]
+  baseline_dat[,min_date:=as.IDate(as.Date(time0)- days(84))]
 
   #two different cut off for the baseline
   #Up to 4 weeks after
   #Up to 1 week after
   #Baseline up to 1 week after:
   bdat1<-copy(baseline_dat)
-  bdat1[,max_date:=as.IDate(as.Date(time0)+ weeks(1))]
+  bdat1[,max_date:=as.IDate(as.Date(time0)+ days(7)- days(1))]
 
   #Baseline up to 4 weeks after:
   bdat4<-copy(baseline_dat)
-  bdat4[,max_date:=as.IDate(as.Date(time0)+ weeks(4))]
+  bdat4[,max_date:=as.IDate(as.Date(time0)+ days(28)- days(1))]
 
   #Save them as a list
   baseline_dat_list<-list(
@@ -238,31 +243,33 @@ temp<-merge.data.table(ptData_missing[,.(PatientID,AdvancedDiagnosisDate)],
                          allow.cartesian=TRUE)
 
 
- ### Entry Criteria - start ###
-  #For baseline value, time windows are:
-  #(-4 months,4 weeks]
-  #(-4 months,1 week]
+#For baseline value, time windows are:
+#(-4 months,4 weeks]
+#(-4 months,1 week]
+#Keeping 7 days a week, 30 days a month,
+#So let's stick to 30*4 = 120 days. 
 
-  #generate two
-  ECOG_tmp<-copy(temp)
-  ECOG_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(4))]
+#generate two
+ECOG_tmp<-copy(temp)
+ECOG_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate) - days(120))]
+# ECOG_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(4))]
 
-  #two different cut off for the baseline
-  #Up to 4 weeks after
-  #Up to 1 week after
-  #Baseline up to 1 week after:
-  bdat1<-copy(ECOG_tmp)
-  bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(1))]
+#two different cut off for the baseline
+#Up to 4 weeks after: 28 days 
+#Up to 1 week after: 7 days
+#Baseline up to 1 week after:
+bdat1<-copy(ECOG_tmp)
+bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ days(7)- days(1))]
 
-  #Baseline up to 4 weeks after:
-  bdat4<-copy(ECOG_tmp)
-  bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(4))]
+#Baseline up to 4 weeks after:
+bdat4<-copy(ECOG_tmp)
+bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ days(28)- days(1))]
 
-  #Save them as a list
-  baseline_dat_list<-list(
-    "week1"=bdat1,
-    "week4"=bdat4
-  )
+#Save them as a list
+baseline_dat_list<-list(
+  "week1"=bdat1,
+  "week4"=bdat4
+)
 
   baseline_dat_list<-
     lapply(baseline_dat_list,function(baseline_dat){
@@ -310,19 +317,20 @@ temp<-merge.data.table(ptData_missing[,.(PatientID,AdvancedDiagnosisDate)],
                        allow.cartesian=TRUE)
 
 #1 year prior to 1 week or 4 weeks after.
+#1 year prior is 30 days * 12 months = 360 days
 weight_tmp<-copy(temp)
-weight_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(12))]
+weight_tmp[,min_date:=as.IDate(as.Date(AdvancedDiagnosisDate) - days(360))]
 
 #two different cut off for the baseline
 #Up to 4 weeks after
 #Up to 1 week after
 #Baseline up to 1 week after:
 bdat1<-copy(weight_tmp)
-bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(1))]
+bdat1[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ days(7)- days(1))]
 
 #Baseline up to 4 weeks after:
 bdat4<-copy(weight_tmp)
-bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ weeks(4))]
+bdat4[,max_date:=as.IDate(as.Date(AdvancedDiagnosisDate)+ days(28)- days(1))]
 
 #Save them as a list
 baseline_dat_list<-list(
@@ -356,11 +364,11 @@ ECOG<-readRDS("ECOG_pattern_missing.rds")
 #For each variable, store 12 weeks observation be fore advanced diagnosis date
 #and 1 week or 4 weeks after.
 all_obs<-ptData_missing[,.(PatientID,AdvancedDiagnosisDate)]
-all_obs[,week_12:=as.IDate(as.Date(AdvancedDiagnosisDate)-weeks(12))]
-all_obs[,month_4:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(4))]
-all_obs[,year_1:=as.IDate(as.Date(AdvancedDiagnosisDate)%m-% months(12))]
-all_obs[,week_plus_1:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(1))]
-all_obs[,week_plus_4:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4))]
+all_obs[,week_12:=as.IDate(as.Date(AdvancedDiagnosisDate)-days(84))]
+all_obs[,month_4:=as.IDate(as.Date(AdvancedDiagnosisDate)-days(120))]
+all_obs[,year_1:=as.IDate(as.Date(AdvancedDiagnosisDate)- days(360))]
+all_obs[,week_plus_1:=as.IDate(as.Date(AdvancedDiagnosisDate)+days(7)- days(1))]
+all_obs[,week_plus_4:=as.IDate(as.Date(AdvancedDiagnosisDate)+days(28)- days(1))]
 
 
 #For primary inclusion criteria, we should expand up to 1 week after
@@ -575,13 +583,16 @@ merge(
 )
 all_obs_primary_week12[,index:=1:.N,by=PatientID]
 
+#generate weekly index
+all_obs_primary_week12[, `weeks since advanced diagnosis date` := floor(as.numeric(difftime(Date,AdvancedDiagnosisDate, units="days")) / 7)]
+
 
 count_observed<-all_obs_primary_week12[,sum(!is.na(.SD)),by=PatientID,.SDcols=c(VOI,auxilliary)]
 count_observed<-count_observed[order(V1,decreasing = T),]  
 count_observed[1,] #FC85B4F31A510
 #FC85B4F31A510 has the largest number of observation.
 #Save this person to work with.
-one_obs_primary<-all_obs_primary_week12[PatientID=="FC85B4F31A510",.SD,.SDcols=c(VOI,auxilliary)]
+one_obs_primary<-all_obs_primary_week12[PatientID=="FC85B4F31A510",]
 
 
 
@@ -602,41 +613,18 @@ all_obs_secondary_week12<-
   )
 all_obs_secondary_week12[,index:=1:.N,by=PatientID]
 
+#generate weekly index
+all_obs_secondary_week12[, `weeks since advanced diagnosis date` := floor(as.numeric(difftime(Date,AdvancedDiagnosisDate, units="days")) / 7)]
+
 count_observed<-all_obs_secondary_week12[,sum(!is.na(.SD)),by=PatientID,.SDcols=c(VOI,auxilliary)]
 count_observed<-count_observed[order(V1,decreasing = T),]  
 count_observed[1,] #F94D0B13A35B4
 #F94D0B13A35B4 has the largest number of observation.
 #Save this person to work with.
-one_obs_secondary<-all_obs_secondary_week12[PatientID=="F94D0B13A35B4",.SD,.SDcols=c(VOI,auxilliary)]
+one_obs_secondary<-all_obs_secondary_week12[PatientID=="F94D0B13A35B4",]
 
 
 
-saveRDS(VOI,"VOI.rds")
-saveRDS(auxilliary,"auxilliary.rds")
-
-saveRDS(all_obs_primary_week12,"all_obs_primary_week12.rds")
-saveRDS(one_obs_primary,"one_obs_primary.rds")
-
-saveRDS(all_obs_secondary_week12,"all_obs_secondary_week12.rds")
-saveRDS(one_obs_secondary,"one_obs_secondary.rds")
-
-```
-
-```{r read-data}
-#| eval: true
-#| echo: false
-#| include: false
-
-#Read in the data
-
-VOI<-readRDS("VOI.rds")
-auxilliary<-readRDS("auxilliary.rds")
-
-all_obs_primary_week12<-readRDS("all_obs_primary_week12.rds")
-one_obs_primary<-readRDS("one_obs_primary.rds")
-
-all_obs_secondary_week12<-readRDS("all_obs_secondary_week12.rds")
-one_obs_secondary<-readRDS("one_obs_secondary.rds")
 
 
 #let's exclude people who are having wrong data 
@@ -689,6 +677,37 @@ one_obs_secondary<-
     one_obs_secondary
   )
 
+
+
+saveRDS(VOI,"VOI.rds")
+saveRDS(auxilliary,"auxilliary.rds")
+
+saveRDS(all_obs_primary_week12,"all_obs_primary_week12.rds")
+saveRDS(one_obs_primary,"one_obs_primary.rds")
+
+saveRDS(all_obs_secondary_week12,"all_obs_secondary_week12.rds")
+saveRDS(one_obs_secondary,"one_obs_secondary.rds")
+
+```
+
+```{r read-data}
+#| eval: true
+#| echo: false
+#| include: false
+
+#Read in the data
+
+VOI<-readRDS("VOI.rds")
+auxilliary<-readRDS("auxilliary.rds")
+
+all_obs_primary_week12<-readRDS("all_obs_primary_week12.rds")
+one_obs_primary<-readRDS("one_obs_primary.rds")
+
+all_obs_secondary_week12<-readRDS("all_obs_secondary_week12.rds")
+one_obs_secondary<-readRDS("one_obs_secondary.rds")
+
+
+
 ```
 
 # Context
@@ -723,874 +742,494 @@ with advanced diagnosis date as the day 0:
 -   Weight (originally from - 6 months):
     -   Primary inclusion criteria: $[-1 year, 1 week]$
     -   Secondary inclusion criteria: $[-1 year, 4 weeks]$
+-   All other 20 lab variables (**auxiliary** and originally was not considered for analysis):
+    -   Primary inclusion criteria: $[-12 weeks, 1 week]$
+    -   Secondary inclusion criteria: $[-12 weeks, 4 weeks]$
+
+
+Even though ECOG and Weight variables were collected further back than -12 weeks, I restricted them to -12 weeks when I performed analysis in the following sections so that I can present all variables nicely.
+
 
 \
 
-# Population level missing
+# How I constructred the data {#sec:how-to-construct-data}
+
+First of all, I excluded 442 patients who had some data fallacy in censoring time. We imputed censoring time according to Flatiron's direction but 442 people's censored date was earlier than advanced diagnosis date. This is false, as patients who were present at the Flatiron's network at the date of advanced diagnosis were able to enter into the dataset. Thus, we used **85,130** for this analysis. 
+
+Table \@ref(tab:tbl-mock-person) is an example of how the data looks like for one person, from -12 weeks back since day of advanced diagnosis to 7 days since advanced diagnosis. Thus, each row shows daily measurement of the variables. We have randomly chosen to present Albumin and white blood cell (WBC) in this table but please know that each person should have 23 columns of all VOIs and auxiliary variables.  
 
 
-For each VOI, we plot proportion of population missing each day. Proportion was calculated with denominator being the number of people alive on the given day.
-
-
-```{r fig.show="hold", out.height='33%', cache=T}
+```{r}
 #| echo: false
 #| eval: true
-#| warning: false
-#| message: false
-#| label: fig-population-missing
-#| fig-cap: Plots of proportion missing of VOIs for entire population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date.
+#| label: tbl-mock-person
+#| tab.cap: "A mock data for one patient. Only albumin and white blood cell (WBC) covariates are shown (but in reality, we should have total 23 columns of variables consisting of VOIs and auxiliary variables). The lab values are captured from 12 weeks prior to diagnosis date until 7 days after. For this particular patient, two observations were captured in total, once in week -2 and another in week 0."
 
 
 
 
-#For each dataset, remove all after censoring date 
-labs_missing<-readRDS("labs_missing.rds")
+# all_obs_primary_week12[PatientID=="F000057FA2792" & !is.na(WBC),]
+# all_obs_primary_week12[,which(PatientID=="F000057FA2792" & !is.na(WBC))] #[1] 76 91 
+
+# 1) pick the blocks you want
+first6  <- all_obs_primary_week12[1:8,.(AdvancedDiagnosisDate,Date,`weeks since advanced diagnosis date`, Albumin,WBC)]
+first6[,AdvancedDiagnosisDate:=as.character(AdvancedDiagnosisDate)]
+first6[,Date:=as.character(Date)]
+
+middle  <- all_obs_primary_week12[75:77,.(AdvancedDiagnosisDate,Date,`weeks since advanced diagnosis date`, Albumin,WBC)]
+middle[,AdvancedDiagnosisDate:=as.character(AdvancedDiagnosisDate)]
+middle[,Date:=as.character(Date)]
 
 
+middle2  <- all_obs_primary_week12[83:91,.(AdvancedDiagnosisDate,Date,`weeks since advanced diagnosis date`, Albumin,WBC)]
+middle2[,AdvancedDiagnosisDate:=as.character(AdvancedDiagnosisDate)]
+middle2[,Date:=as.character(Date)]
 
-tmp1<-copy(labs_missing)
-Albumin_population<-
-lapply(tmp1,function(dat){
-  
-  
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath,DeathInd,earliest_valid_ResultDate__on_after_time0_PDL1,earliest_valid_ResultDate__on_after_time0_NoPDL1,StartDate, SmokingStatus,Gender,RaceEthnicity,age_at_advDiag, Histology)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  
-  #restrict to before death/censor.
-  subdat<-subdat[Date<=DateOfDeath,]
-  
-  #index for each day
-  subdat[,num_day_from_diag:=as.numeric(interval(time0,Date),"days")]
-  
-  subdat[,mean(is.na(Albumin)),by=num_day_from_diag]
-
-})
-
-
-
-
-tmp2<-data.table(
-  group=rep(c("Primary inclusion criteria","Secondary inclusion criteria"), times=c(nrow(Albumin_population[[1]]), nrow(Albumin_population[[2]]))),
-  rbind(Albumin_population[[1]],Albumin_population[[2]])
+# 2) make 3 “ellipsis” rows
+#    here we use the vertical ellipsis character U+22EE
+ellipsis_row <- rep("\u22EE", ncol(first6))
+ellipsis3     <- as.data.table(
+  matrix(ellipsis_row, nrow = 3, ncol = ncol(first6),
+         dimnames = list(NULL, names(first6)))
 )
 
-ggplot(tmp2, aes(x=num_day_from_diag, y=V1)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  facet_grid(~group)+
-  ggtitle("Proportion of missing Albumin")+
-  scale_x_continuous(breaks =c(-14*1:6,0,14*1:2) )+
-  scale_y_continuous(breaks =seq(0.95,1,by=0.01)) 
+# 3) stitch them together
+to_show <- rbindlist(list(
+  first6,
+  ellipsis3,
+  middle,
+  ellipsis3,
+  middle2,
+  ellipsis3
+), use.names = TRUE, fill = TRUE)
 
+# 4) print with kable + some styling
+# knitr::kable(
+#   to_show,
+#   # caption = "A mock data for one patient. Only albumin and WBC covariates are shown.",
+#   escape  = FALSE
+# ) %>%
+#   kable_styling(
+#     bootstrap_options = c("striped","hover","condensed"),
+#     full_width = FALSE
+#   )
 
-# #Zoom in 
-# ggplot(tmp2[num_day_from_diag>=-30], aes(x=num_day_from_diag, y=V1)) +
-#   geom_line() +
-#   labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-#   facet_grid(~group)+
-#   ggtitle("Zoom in to month: Proportion of missing Albumin")+
-#   scale_x_continuous(breaks =c(-14*1:6,0,14*1:2) )
-
-#Likewise for ECOG. back to 4 months
-ECOG_missing<-readRDS("ECOG_missing.rds")
-tmp1<-copy(ECOG_missing)
-ECOG_population<-
-lapply(tmp1,function(dat){
-  
-  
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath,DeathInd,earliest_valid_ResultDate__on_after_time0_PDL1,earliest_valid_ResultDate__on_after_time0_NoPDL1,StartDate, SmokingStatus,Gender,RaceEthnicity,age_at_advDiag, Histology)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  
-  #restrict to before death/censor.
-  subdat<-subdat[Date<=DateOfDeath,]
-  
-  #index for each day
-  subdat[,num_day_from_diag:=as.numeric(interval(AdvancedDiagnosisDate,Date),"days")]
-  
-  subdat[,mean(is.na(ECOG)),by=num_day_from_diag]
-
-})
-
-tmp2<-data.table(
-  group=rep(c("Primary inclusion criteria","Secondary inclusion criteria"), times=c(nrow(ECOG_population[[1]]), nrow(ECOG_population[[2]]))),
-  rbind(ECOG_population[[1]],ECOG_population[[2]])
-)
-
-# tmp2$num_day_from_diag |> range() #-123   28
-ggplot(tmp2, aes(x=num_day_from_diag, y=V1)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  facet_grid(~group)+
-  ggtitle("Proportion of missing ECOG")+
-  # scale_x_continuous(breaks =c(-7*1:16,0,7:1*4) )
-  scale_x_continuous(breaks =c(-14*1:8,0,14*1:2) )
-
-
-
-#Body weight up to 1 year before
-weight_missing<-readRDS("weight_missing.rds")
-tmp1<-copy(weight_missing)
-weight_population<-
-lapply(tmp1,function(dat){
-  
-  
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath,DeathInd,earliest_valid_ResultDate__on_after_time0_PDL1,earliest_valid_ResultDate__on_after_time0_NoPDL1,StartDate, SmokingStatus,Gender,RaceEthnicity,age_at_advDiag, Histology)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  
-  #restrict to before death/censor.
-  subdat<-subdat[Date<=DateOfDeath,]
-  
-  #index for each day
-  subdat[,num_day_from_diag:=as.numeric(interval(AdvancedDiagnosisDate,Date),"days")]
-  
-  subdat[,mean(is.na(weight)),by=num_day_from_diag]
-
-})
-
-tmp2<-data.table(
-  group=rep(c("Primary inclusion criteria","Secondary inclusion criteria"), times=c(nrow(weight_population[[1]]), nrow(weight_population[[2]]))),
-  rbind(weight_population[[1]],weight_population[[2]])
-)
-
-
-ggplot(tmp2, aes(x=num_day_from_diag, y=V1)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  facet_grid(rows=vars(group))+
-  ggtitle("Proportion of missing weight")+
-  # scale_x_continuous(breaks =c(-7*1:16,0,7:1*4) )
-  scale_x_continuous(breaks =c(-14*1:27,0,14*1:2) )
-
-```
-
-
-Based on the above graphs, it looks like there are patterns of increased number of measurement every 7 days. I wondered if it's the same patient who receives measurement every 7 days. So I looked into the data but that was not the case. 
-
-```{r measure-every-7-days}
-#| echo: false
-#| eval: false
-
-
-#Find out If it's the same people who get measurement every 7 days:
-
-
-Albumin_population$week_1[num_day_from_diag==0,]
-Albumin_population$week_1[num_day_from_diag==-3,]
-Albumin_population$week_1[num_day_from_diag==-7,]
-Albumin_population$week_1[num_day_from_diag==-14,]
-Albumin_population$week_1[num_day_from_diag==-18,]
-
-
-tmp1<-copy(labs_missing)
-tmp2<-
-lapply(tmp1,function(dat){
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath,DeathInd,earliest_valid_ResultDate__on_after_time0_PDL1,earliest_valid_ResultDate__on_after_time0_NoPDL1,StartDate, SmokingStatus,Gender,RaceEthnicity,age_at_advDiag, Histology)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  subdat
-  
-  #For each person, find out if they have measurement every 7th day 
-  #Among the peolpe who have measurement on day 0
-  pt<-subdat[!is.na(Albumin) & Date==time0, PatientID]
-  
-  #Who received every 7 days back for let's day 4 cycles?
-  subdat1<-subdat[PatientID %in% pt,]
-  subdat1[,time_since_adv_diag_week:=floor(as.numeric(interval(time0,Date),"days")/7)]
-  #How many people see observation on every week?
-  subdat1<-subdat1[,sum(!is.na(Albumin)>0),by=.(PatientID,time_since_adv_diag_week)]
-  subdat1<-subdat1[,mean(V1!=0),by=PatientID]
-  prop_weeks_observed_among_observed_on_time0<-subdat1[,table(V1)] #all 1. That means that
-  #If you were observed on day 0, then you were observed every week
-  
-  
-  #What about those who don't have record on the day 0?
-  pt<-subdat[is.na(Albumin) & Date==time0, PatientID]
-  pt<-unique(pt)
-  length(pt)#83058
-  subdat1<-subdat[PatientID %in% pt,]
-  subdat1[,time_since_adv_diag_week:=floor(as.numeric(interval(time0,Date),"days")/7)]
-  
-  #Make sure everyone has all dates
-  check_num_dates<-subdat1[,diff(Date),by=PatientID]
-  check_num_dates[,table(V1)] #Only V1. 
-  #Good.
-  
-  #How many people see observation on every week?
-  subdat1<-subdat1[,sum(!is.na(Albumin)>0),by=.(PatientID,time_since_adv_diag_week)]
-  subdat1<-subdat1[,mean(V1!=0),by=PatientID]
-  prop_weeks_observed_among_not_observed_on_time0<-subdat1[,table(V1)] #all 1. That means that
-  
-  #Return the two proportions
-  list(
-    "prop_weeks_observed_among_observed_on_time0"=prop_weeks_observed_among_observed_on_time0,
-    "prop_weeks_observed_among_not_observed_on_time0"=prop_weeks_observed_among_not_observed_on_time0
+#Adding kable_styling() messes up the table caption numbreing
+knitr::kable(
+  to_show,
+  escape = FALSE
   )
 
-})  
-
-tmp2
-# $week_1
-# $week_1$prop_weeks_observed_among_observed_on_time0
-# V1
-# 0.0714285714285714  0.142857142857143  0.214285714285714  0.285714285714286  0.357142857142857  0.428571428571429 
-#                868                580                235                133                 83                 56 
-#                0.5  0.571428571428571  0.642857142857143  0.714285714285714  0.785714285714286  0.857142857142857 
-#                 46                 29                 12                 14                  8                  3 
-#  0.928571428571429                  1 
-#                  3                  2 
-# 
-# $week_1$prop_weeks_observed_among_not_observed_on_time0
-# V1
-#                  0 0.0714285714285714  0.142857142857143  0.214285714285714  0.285714285714286  0.357142857142857 
-#              59109              16131               4232               1551                738                448 
-#  0.428571428571429                0.5  0.571428571428571  0.642857142857143  0.714285714285714  0.785714285714286 
-#                340                214                113                 81                 46                 25 
-#  0.857142857142857  0.928571428571429 
-#                 20                 10 
-# 
-# 
-# $week_4
-# $week_4$prop_weeks_observed_among_observed_on_time0
-# V1
-# 0.0588235294117647  0.117647058823529  0.176470588235294  0.235294117647059  0.294117647058824  0.352941176470588 
-#                506                545                372                237                139                 85 
-#  0.411764705882353  0.470588235294118  0.529411764705882  0.588235294117647  0.647058823529412  0.705882352941177 
-#                 60                 47                 22                 16                 18                 12 
-#  0.823529411764706  0.882352941176471  0.941176470588235 
-#                  7                  3                  3 
-# 
-# $week_4$prop_weeks_observed_among_not_observed_on_time0
-# V1
-#                  0 0.0588235294117647  0.117647058823529  0.176470588235294  0.235294117647059  0.294117647058824 
-#              35439              25647              12394               5181               2110                880 
-#  0.352941176470588  0.411764705882353  0.470588235294118  0.529411764705882  0.588235294117647  0.647058823529412 
-#                494                332                233                129                 86                 57 
-#  0.705882352941177  0.764705882352941  0.823529411764706  0.882352941176471  0.941176470588235 
-#                 24                 29                 12                  6                  5 
+```
 
 
-#Based on my calculation, this is what's going in. 
-# When I look at people who have observed albumin on time 0, and tried to see if they observed albumin every 7th day, I just did this by finding out whether or not there was any observation weekly. 
-#If you look at the output for  $week_4$prop_weeks_observed_among_observed_on_time0, 868 patients are showing proportion = 0.0714285714285714. This means that among 868 patients who observed Albumin on the day of advanced diagnosis, there were only 7.14% of total weeks where the Albumin was observed.
+When we create a weekly interval, we take average of all observed values in the interval. Thus, each person has 13 rows. Table  \@ref(tab:tbl-mock-average) shows an example of this dataset using the data in Table \@ref(tab:tbl-mock-person).
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: tbl-mock-average 
+#| tab.cap: "A mock data for one patient. Observation for Albumin and white blood cell (WBC) are shown. average of all observation each week is shown. If NaN, that means there was no observation seen in that week. This patient is the same patient shown in the previous table."
+
+
+mock_average<-
+all_obs_primary_week12[PatientID=="F000057FA2792",lapply(.SD,function(x)mean(x,na.rm=T)),by=.(`weeks since advanced diagnosis date`),.SDcols = c("Albumin", "WBC")]
+
+kable(
+  mock_average,
+  escape  = FALSE
+)
+
+```
+
+
+
+# Proportion of observed values for each person
+
+\
+
+
+
+## Weekly interval
+
+We showed an example dataset of how weekly interval looks like in Section \@ref(sec:how-to-construct-data). We generated data like Table \@ref(tab:tbl-mock-person) for all eligible patients (N=85130). And then we took a proportion of weeks that had any observation during the week. There are 13 weeks total, so the denominator used for this calculation was 13. For example, for the patient in Table \@ref(tab:tbl-mock-person) will have 2/13 =  0.1538 for Albumin and WBC. We calculated this proportion for all 23 variables and showed bar plots in Figure \@ref(fig:fig-prop-observed-per-person-weekly). 
+
+```{r fig-prop-observed-per-person-weekly}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+#| fig.cap: Proportion of observing the lab variable at least once in 7-day interval per person. The axis is cut out at 0.25, but the outliers go up to 1. The denominator used for calculating the proportion was 13, as our data interval was -12 weeks to +1 week since the advanced diagnosis date.
+
+
+
+
+
+#Just identify variables missing that has most observation per person and choose the top 5 to display.
+
+#First, average out the values over the week
+average_over_week<-all_obs_primary_week12[,lapply(.SD,function(x)mean(x,na.rm=T)), .SDcols = c(VOI,auxilliary),by=.(PatientID,`weeks since advanced diagnosis date`)]
+
+prop_obs_primary<-average_over_week[,lapply(.SD,function(x)mean(!is.na(x))), .SDcols = c(VOI,auxilliary),by=.(PatientID)]
+
+prop_obs_primary_long<-melt(prop_obs_primary,id.vars = "PatientID", measure.vars = c(VOI,auxilliary))
+
+
+# Change outlier, color, shape and size
+ggplot(prop_obs_primary_long, aes(x=variable, y=value)) + 
+  geom_boxplot(notch=TRUE)+
+  scale_y_continuous(limits = c(0,0.25))+
+  ggtitle("Proportoin of non-missing obsertation per patient")+
+  ylab("Proportion of weeks observed the variable per person")+
+  coord_flip() 
+```
+
+```{r calc-quartiles-to-explain-figure}
+#| echo: false
+#| eval: true
+
+
+#Calculate 1st and 3rd quartile to explain the above plot
+prop_obs_primary_summary<-
+lapply(c(VOI,auxilliary),function(x)summary(prop_obs_primary[[x]]))
+names(prop_obs_primary_summary)<-c(VOI,auxilliary)
+prop_obs_primary_summary<-
+data.table(
+  "Variable" = c(VOI,auxilliary),
+  do.call(rbind,prop_obs_primary_summary)
+)
+
+
+#save variable names to print.
+max_3rdq<-prop_obs_primary_summary[`3rd Qu.`==max(`3rd Qu.`),unique(`3rd Qu.`)]
+max_1stq<-prop_obs_primary_summary[`1st Qu.`==max(`1st Qu.`),unique(`1st Qu.`)]
+
+vars_with_max_3rd_quarts<-prop_obs_primary_summary[`3rd Qu.`==max(`3rd Qu.`),Variable]
+if(length(vars_with_max_3rd_quarts)==1){
+  vars_with_max_3rd_quarts_print<-vars_with_max_3rd_quarts
+}else if(length(vars_with_max_3rd_quarts)==2){
+  vars_with_max_3rd_quarts_print<-paste(vars_with_max_3rd_quarts[1]," and ",vars_with_max_3rd_quarts[2], sep="")
+}else{
+  N<-length(vars_with_max_3rd_quarts)
+  vars_with_max_3rd_quarts_print<-vars_with_max_3rd_quarts[1]
+  for(i in 2:(N-1)){
+    vars_with_max_3rd_quarts_print<-paste(vars_with_max_3rd_quarts_print,", ",vars_with_max_3rd_quarts[i], sep="")
+  }
+  vars_with_max_3rd_quarts_print<-paste(vars_with_max_3rd_quarts_print,", and ",vars_with_max_3rd_quarts[N], sep="")
+}
+```
+
+Note that the 1st and 3rd quartiles of `r vars_with_max_3rd_quarts_print` are all the same (IQR = `r max_1stq` - `r round(max_3rdq,4)`) in Figure \@ref(fig:fig-prop-observed-per-person-weekly). We will call these `r length(vars_with_max_3rd_quarts)` variables ***substantially observed variables*** in this subsection hereafter.  It's kind of bad that 3rd quartile is just `r round(max_3rdq,4)` for the substantially observed variables. Too many patients only had 1/13 =0.0769  weeks observed.  In Table \@ref(tab:tbl-prop-observed-per-person-weekly), we show just 6 of these variables, that has the highest mean value from top to bottom. 
+
+
+
+```{r tbl-prop-observed-per-person-weekly}
+#| echo: false
+#| eval: true
+#| tab.cap: The top six varibles with highst mean of observing at least one value every 7 days per person. 
+
+
+
+
+#Sort it by mean value because median is 0 for all
+kable(
+  prop_obs_primary_summary[order(Mean,decreasing = T),][1:6,],
+  digits = 5
+)
+
+```
+
+
+So if a patient observed the value only one week, are all variables observed in that week? Like, `r vars_with_max_3rd_quarts`  basically have similar distribution. And based on the Table \@ref(tab:tbl-prop-observed-per-person-weekly), it seems like on average, there was only 1 week was observed. So would that mean that at least for `r vars_with_max_3rd_quarts`, if they were measured, were they measured during the same week?  
+
+
+Table \@ref(tab:tbl-identify-what-week-observation-is-made-primary) shows one person in the dataset where such is not the case. 
+```{r }
+#| echo: false
+#| eval: true
+#| label: tbl-identify-what-week-observation-is-made-primary
+#| tab.cap: "One person's data showning the weeks that each variable is observed. All 16 variables with substantially big IQR in Figure 4.1 were observed in this person. "
+
+
+#for each patient, identify at what week they make the observation
+# get_weeks<-function(dat,variable){
+#   dat[!is.na(get(variable)),`weeks since advanced diagnosis date`]
+# }
+# 
+# tmptmp<-
+# lapply(c(VOI,auxilliary),function(x){
+# 
+# average_over_week[,get_weeks(.SD,variable = x),by=PatientID]
+# 
+# })
+# names(tmptmp)<-c(VOI,auxilliary)
+# 
+# saveRDS(tmptmp,"week_observe_primary.rds") #this takes too long. So just save it and read it in.
+# 
+# tmptmp<-readRDS("week_observe_primary.rds")
+# 
+# 
+# #Expand by weeks 
+# tmptmp<-lapply(tmptmp, function(dat){dcast(dat,formula = PatientID~V1)})
+# 
+# 
+# #get each person's data
+# 
+# #If the person didn't have any observation for all 23 variables, just leave the person out. 
+# test<-average_over_week[,any(!is.na(.SD)),.SDcols = c(VOI,auxilliary),by=PatientID]
+# pt_have_obs<-test[V1==TRUE,PatientID] #these are the people who have at least one observation
+# 
+# 
+# tmptmp_no_CKD_epi<-tmptmp[c(VOI,auxilliary)[!c(VOI,auxilliary) %in% c("eGFR_mdrd","eGFR_ckd_epi")]]
+# 
+# library(parallel)
+# per_patient<-
+# mclapply(pt_have_obs,function(pt){
+#   pt_dat<-lapply(tmptmp_no_CKD_epi, function(dat)dat[PatientID==pt])
+#   for(var_name in names(pt_dat)){
+#     pt_dat[[var_name]][,variable:=var_name]
+#   }
+#   pt_dat<-rbindlist(pt_dat)
+#   
+#   
+#   #find out if the patient observed all lab values in the same week
+#   #if they ever observed the lab value.
+#   
+#   #Find the weeks we have observed some values
+#   week_observed<-apply(pt_dat[,.SD,.SDcols=as.character(c(-12:0))],2,function(x){any(!is.na(x))})
+#   week_observed<-names(week_observed)[week_observed==TRUE]
+#   
+#   
+#   
+#   
+#   list(
+#     "variables"=pt_dat$variable, #the variables that appear in the person's data set
+#     "week_observed_all_variable"=pt_dat[,sapply(.SD,function(var){sum(!is.na(var))==nrow(pt_dat)}), .SDcols = week_observed]  #for those weeks identify if all variables were observed. IF TRUE, then yes, they were all observed.
+# 
+#   )
+#   
+# },mc.cores=ncores)
+# names(per_patient)<-pt_have_obs
+# saveRDS(per_patient,"per_patient_weekly_primary.rds")
+
+# per_patient #there are lots of false. 
+# identify how many have false in them.
+# 
+# per_patient_table<-
+# sapply(per_patient,function(pt){
+#   any(pt$week_observed_all_variable==FALSE)
+# })
+# table(per_patient_table)
+# #FALSE  TRUE 
+# #19483 19246
+# 
+# # 19246/(19246+19483) patients have at least one FALSE
+# # Meaning  about half of the patients who have at least one measruement don't observe all variables that they ever observe. 
+# # For example find a person with FALSE and have variables in vars_with_max_3rd_quarts and out of it. 
+# example_dat_find<-
+# sapply(per_patient,function(pt){
+#   
+#   if(all(pt$week_observed_all_variable==TRUE)){
+#     return(FALSE)
+#   }
+#   
+#   if(all(vars_with_max_3rd_quarts %in% pt$variables )){
+#     return(FALSE)
+#   }
+#   
+#   TRUE
+# })
+# example_dat_find_pt<-names(example_dat_find)[example_dat_find==TRUE]
+# 
+# example_dat_find_pt[1] #F000C6DA2A227 <-example?
+# per_patient["F000C6DA2A227"]
+
+#Present one as an example. 
+# #for example, patient F06D5BC1BDB55"
+
+
+
+
+
+
+tmptmp<-readRDS("week_observe_primary.rds")
+for(var_dat in names(tmptmp)){
+  tmptmp[[var_dat]][,value:=1]
+  setnames(tmptmp[[var_dat]],"V1","week")
+}
+#Expand by weeks
+tmptmp<-lapply(tmptmp, function(dat){dcast(dat,formula = PatientID~week, value.var = "value")})
+# pt_dat<-lapply(tmptmp, function(dat)dat[PatientID=="F000C6DA2A227"])
+pt_dat<-lapply(tmptmp, function(dat)dat[PatientID=="F00053606F5B8"])
+
+for(var_name in names(pt_dat)){
+    pt_dat[[var_name]][,variable:=var_name]
+  }
+pt_dat<-rbindlist(pt_dat)
+pt_dat2<-pt_dat[,.SD,.SDcols=c("variable",-12:0)]
+
+setnames(pt_dat2,
+         old=as.character(-12:0),
+         new=c(paste("week",-12:0)))
+
+#order it so that vars_with_max_3rd_quarts are grouped at the top
+
+vars_with_max_3rd_quarts_one_pt<-vars_with_max_3rd_quarts[vars_with_max_3rd_quarts %in% pt_dat2$variable]
+# length(vars_with_max_3rd_quarts_one_pt)
+
+not_vars_with_max_3rd_quarts_one_pt<-vars_with_max_3rd_quarts[!vars_with_max_3rd_quarts %in% pt_dat2$variable]
+# length(not_vars_with_max_3rd_quarts_one_pt) #0. Don't use it. 
+
+pt_dat3<-
+data.table(
+  # "grouping"=c(
+  #   "variable in much observed",
+  #   rep("",length(vars_with_max_3rd_quarts_one_pt)-1),
+  #   "Variable not observed much",
+  #   rep("", length(not_vars_with_max_3rd_quarts_one_pt)-1)
+  # ),
+  
+  rbind(
+    pt_dat2[variable %in% vars_with_max_3rd_quarts_one_pt,],
+    pt_dat2[variable %in% not_vars_with_max_3rd_quarts_one_pt,]
+    )
+)
+
+#options(knitr.kable.NA = '') to hide NA values.
+options(knitr.kable.NA = '') 
+kable(
+  pt_dat3,
+  escape  = FALSE
+)
+
+
+```
+
+
+
+Since many variables seemed like they were observed with equal proportion, it seemed like if the variable is observed, then it is observed in the person.  Among those who had at least 1 week observed, when does this one observation get made?
+
+
+
+
+Figure \@ref(fig:fig-weekly-interval) shows the plot of amount of missing across the combination of substantially observed variables in 100 randomly selected patients (there were too many observations and too many variables to display the whole dataset).
+
+```{r weekly-interval, fig.height=12, fig.width=10}
+#| echo: false
+#| eval: true
+#| label: fig-weekly-interval
+#| fig.cap: "Plots of amount of missing values in each variable and the amount of missing values of substantially observed variables. 100 random patients were selected for the display. The measurements were averaged over 7 days. Blue represents observed and red represents missing."
+
+
+
+
+
+# #average weekly
+# mock_average_all<-
+# all_obs_primary_week12[,lapply(.SD,function(x)mean(x,na.rm=T)),by=.(`weeks since advanced diagnosis date`,PatientID),.SDcols = c(VOI,auxilliary)]
+# 
+# 
+# #Since we are doing -12 weeks to +1 week, we will have 13 observations for each lab values
+# #Find number of weeks non-missing
+# 
+# aggr_plot <- aggr(mock_average_all[,.SD,.SDcols = c(VOI,auxilliary)], col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=c(VOI,auxilliary), cex.axis=.7, gap=3,
+# ylab=c("Histogram of missing data","Pattern")) #too many variables to display.
+
+
+
+# #restrict to vars_with_max_3rd_quarts
+# mock_average_all<-
+# all_obs_primary_week12[,lapply(.SD,function(x)mean(x,na.rm=T)),by=.(`weeks since advanced diagnosis date`,PatientID),.SDcols = vars_with_max_3rd_quarts]
+# #Since we are doing -12 weeks to +1 week, we will have 13 observations for each lab values
+# #Find number of weeks non-missing
+# aggr_plot <- aggr(mock_average_all[,.SD,.SDcols = vars_with_max_3rd_quarts], col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=vars_with_max_3rd_quarts, cex.axis=.7, gap=3,
+# ylab=c("Histogram of missing data","Pattern")) #too many paients to display
+
+
+
+
+#choose 100 random people
+set.seed(4)
+random_id<-sample(unique(all_obs_primary_week12$PatientID),size = 100, replace = FALSE)
+mock_average_random_samples<-all_obs_primary_week12[PatientID %in% random_id,lapply(.SD,function(x)mean(x,na.rm=T)),by=.(`weeks since advanced diagnosis date`,PatientID),.SDcols = vars_with_max_3rd_quarts]
+
+  
+
+
+# png(paste("VIM_plot.png", sep=""),height=20,width=10, units="in",res=300)
+aggr_plot <- aggr(mock_average_random_samples[,.SD,.SDcols = vars_with_max_3rd_quarts], col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=vars_with_max_3rd_quarts, cex.axis=.7, gap=3,
+ylab=c("Histogram of missing data","Pattern")) #too many variables to display.
+# dev.off()
+# summary(aggr_plot)
+
+
+
+
 ```
 
 
 \
 
-We present the same graphs but combined the three VOIs in a single single plot. 
 
-```{r fig.show="hold", out.width='49%',  fig.height=6}
+
+
+## Monthly interval{}
+
+We saw that 
+Since we go back to 12 weeks, let's make it every 4 weeks. 
+
+```{r fig-prop-observed-per-person-monthly}
 #| echo: false
 #| eval: true
 #| warning: false
 #| message: false
-#| label: fig-population-missing-comb
-#| fig-cap: Plots of proportion missing for entire population 
+#| fig.cap: Proportion of observing the lab variable at least once in 30-day interval per person. The axis is cut out at 0.25, but the outliers go up to 1. The denominator used for calculating the proportion was 4, as our data interval was -12 weeks to +1 week since the advanced diagnosis date. The las tinterval is not 30 days, it's only 7 days after advanced diagnosis date.
 
 
 
 
+#Just identify variables missing that has most observation per person and choose the top 5 to display.
+all_obs_primary_week12[,`months since advanced diagnosis date`:=`weeks since advanced diagnosis date`]
+all_obs_primary_week12[`weeks since advanced diagnosis date` %in% -1:-4,`months since advanced diagnosis date`:=-1]
+all_obs_primary_week12[`weeks since advanced diagnosis date` %in% -5:-8,`months since advanced diagnosis date`:=-2]
+all_obs_primary_week12[`weeks since advanced diagnosis date` %in% -9:-12,`months since advanced diagnosis date`:=-3]
 
-#We have total 92 days (- 12 weeks , 1 week) for primary
-#let's calculate proportion missing for each day of these weeks for 
-#each variable.
+average_over_month<-all_obs_primary_week12[,lapply(.SD,function(x)mean(x,na.rm=T)), .SDcols = c(VOI,auxilliary),by=.(PatientID,`months since advanced diagnosis date`)]
+
+prop_obs_primary_mth<-average_over_month[,lapply(.SD,function(x)mean(!is.na(x))), .SDcols = c(VOI,auxilliary),by=.(PatientID)]
+
+prop_obs_primary_long_mth<-melt(prop_obs_primary_mth,id.vars = "PatientID", measure.vars = c(VOI,auxilliary))
 
 
-all_dat<-list(
-  "Albumin" = copy(Albumin_population$week_1),
-  "ECOG"=copy(ECOG_population$week_1),
-  "weight"=copy(weight_population$week_1)
+# Change outlier, color, shape and size
+ggplot(prop_obs_primary_long_mth, aes(x=variable, y=value)) + 
+  geom_boxplot(notch=TRUE)+
+  ggtitle("Proportoin of non-missing obsertation per patient")+
+  ylab("Proportion of weeks observed the variable per person")+
+  coord_flip() 
+```
+
+
+
+```{r tbl-prop-observed-per-person-monthly}
+#| echo: false
+#| eval: true
+#| tab.cap: The top six varibles with highst mean of observing at least one value every 30 days per person. 
+
+
+prop_obs_primary_summary<-
+lapply(c(VOI,auxilliary),function(x)summary(prop_obs_primary_mth[[x]]))
+names(prop_obs_primary_summary)<-c(VOI,auxilliary)
+prop_obs_primary_summary<-
+data.table(
+  "Variable" = c(VOI,auxilliary),
+  do.call(rbind,prop_obs_primary_summary)
 )
-
-all_dat$Albumin[,variable:="Albumin"]
-all_dat$ECOG[,variable:="ECOG"]
-all_dat$weight[,variable:="weight"]
-
-all_dat<-rbindlist(all_dat)
-
-ggplot(all_dat,
-       aes(x=num_day_from_diag, y=V1, color=variable)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  theme_minimal()+
-  ggtitle("A) Primary inclusion criteria")
-
-
-
-
-all_dat<-list(
-  "Albumin" = copy(Albumin_population$week_4),
-  "ECOG"=copy(ECOG_population$week_4),
-  "weight"=copy(weight_population$week_4)
+#Sort it by mean value because median is 0 for all
+kable(
+  prop_obs_primary_summary[order(Mean,decreasing = T),][1:6,],
+  digits = 5
 )
-
-all_dat$Albumin[,variable:="Albumin"]
-all_dat$ECOG[,variable:="ECOG"]
-all_dat$weight[,variable:="weight"]
-
-all_dat<-rbindlist(all_dat)
-
-ggplot(all_dat,
-       aes(x=num_day_from_diag, y=V1, color=variable)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  theme_minimal()+
-  ggtitle("B) Secondary inclusion criteria")
-
-# all_obs_primary_long<-
-# melt(all_obs_primary_week12,id.vars = c("PatientID","index"),measure.vars=c(VOI,auxilliary), variable.name = "var", value.name = "val")
-# 
-# population_summary_primary<-all_obs_primary_long[,mean(is.na(val)),by=.(index,var)]
-# setnames(population_summary_primary,"V1","pct_miss")
-# 
-# ggplot(population_summary_primary[var %in% VOI,],
-#        aes(x=index, y=pct_miss, color=var)) +
-#   geom_line() +
-#   labs(y="Percent missing", x="Day number") +
-#   theme_minimal()+
-#   ggtitle("A) Primary inclusion criteria")
-# 
-# 
-# 
-# 
-# #We have total 113 days (- 12 weeks , 4 week) for primary
-# #let's calculate proportion missing for each day of these weeks for 
-# #each pvariable.
-# 
-# all_obs_secondary_week12[,index:=1:.N,by=PatientID]
-# 
-# all_obs_secondary_long<-
-#   melt(all_obs_secondary_week12,id.vars = c("PatientID","index"),measure.vars=c(VOI,auxilliary), variable.name = "var", value.name = "val")
-# 
-# population_summary_secondary<-all_obs_secondary_long[,mean(is.na(val)),by=.(index,var)]
-# setnames(population_summary_secondary,"V1","pct_miss")
-# 
-# 
-# ggplot(population_summary_secondary[var %in% VOI,],
-#        aes(x=index, y=pct_miss, color=var)) +
-#   geom_line() +
-#   labs(y="Percent missing", x="Day number") +
-#   theme_minimal()+
-#   ggtitle("B) Secondary inclusion criteria")
-
-```
-
-
-\
-
-So... there seems to be some pattern over days. But the proportion of missing is too big. I'm not sure what I can use this information for.
-
-
-
-\
-
-I looked at the same graphs for all auxiliary variables, which is shown in Figure \@ref(fig:fig-population-aux). Similar patterns are observed as in VOIs. But again, proportion missing is so large that I don't know if this is worth any.
-
-
-
-
-```{r cache=TRUE,fig.show="hold", out.width='100%',  fig.height=6}
-#| echo: false
-#| eval: true
-#| label: fig-population-aux
-#| fig-cap: Proportion of missing observation of all auxiliary variables.
-
-
-
-#generate the same graph for all auxiliary variables to see if we can catch the sampe patterns. 
-
-
-tmp1<-copy(labs_missing)
-aux_population<-
-lapply(tmp1,function(dat){
-  
-  
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath,DeathInd,earliest_valid_ResultDate__on_after_time0_PDL1,earliest_valid_ResultDate__on_after_time0_NoPDL1,StartDate, SmokingStatus,Gender,RaceEthnicity,age_at_advDiag, Histology)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  
-  #restrict to before death/censor.
-  subdat<-subdat[Date<=DateOfDeath,]
-  
-  #index for each day
-  subdat[,num_day_from_diag:=as.numeric(interval(time0,Date),"days")]
-  
-  subdat[,lapply(.SD,function(x)mean(is.na(x))),by=num_day_from_diag, .SDcols = auxilliary]
-
-})
-
-tmp2<-  data.table(
-  group=rep(c("Primary inclusion criteria","Secondary inclusion criteria"), times=c(nrow(aux_population[[1]]), nrow(aux_population[[2]]))),
-  rbind(aux_population[[1]],aux_population[[2]])
-)
-
-tmp3<-tmp2 |> 
-melt(id.vars=c("group","num_day_from_diag"),
-     measure.vars=auxilliary,
-     variable.name="variable",
-     value.name = "value")
-
-
-#Generate label for plot
-
-
-tmp3[,index:=1:length(value),by=.(group,variable)]
-tmp3[,last_obs:=max(index),by=.(group,variable)]
-tmp3[,is_last_obs:=(index==last_obs),by=.(group,variable)]
-
-tmp3[,label:=as.character(NA)]
-tmp3[is_last_obs==TRUE,label:=variable]
-
-
-
-ggplot(tmp3,
-       aes(x=num_day_from_diag, y=value, color=variable)) +
-  geom_line() +
-  facet_grid(cols=vars(group))+
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  theme_minimal()+
-  ggtitle("Proportion of missing auxiliary variables" )
-  
-
-
-```
-
-
-\
-
-# Subject-level summaries
-
-## Missingness proportion per subject
-
-
-We will explore proportion of days of missing observation per each patient restricted to 12 weeks before the advanced diagnosis date.
-
-```{r fig.show="hold", out.width='49%',  fig.height=6, fig.width=10}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: fig-subject-level-missing-v1
-#| fig-cap: Figure XX. Plots of proportion missing
-
-
-
-sub_level_missing_primary1<-all_obs_primary_week12[,lapply(.SD,function(x)mean(is.na(x))),.SDcols = VOI,by=PatientID]
-
-sub_level_missing_secondary1<-all_obs_secondary_week12[,lapply(.SD,function(x)mean(is.na(x))),.SDcols = VOI,by=PatientID]
-
-sub_level_missing_primary1<-
-melt(sub_level_missing_primary1,
-     id.vars="PatientID",
-     measure.vars = VOI,
-     variable.name = "voi",
-     value.name = "rate")
-
-sub_level_missing_secondary1<-
-melt(sub_level_missing_secondary1,
-     id.vars="PatientID",
-     measure.vars = VOI,
-     variable.name = "voi",
-     value.name = "rate")
-
-
-ggplot(sub_level_missing_primary1, mapping = aes(x=rate))+
-    geom_histogram(bins=30) +
-  # geom_histogram(stat="density") +
-  # geom_area(stat = "density", adjust = 0.5)+
-  facet_wrap(~voi) +
-  labs(x="Proportion of days missing") +
-  theme_minimal()+
-  ggtitle("A) Primary inclusion criteria")
-
-
-
-ggplot(sub_level_missing_secondary1, mapping = aes(x=rate))+
-    geom_histogram(bins=30) +
-  # geom_histogram(stat="density") +
-  # geom_area(stat = "density", adjust = 0.5)+
-  facet_wrap(~voi) +
-  labs(x="Proportion of days missing") +
-  theme_minimal()+
-  ggtitle("B) Secondary inclusion criteria")
-```
-
-### Correlate subject-level missing rates with auxiliaries
-
-```{r corr-missing-aux-code}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-
-
-
-primary_voi_missing_binary<-all_obs_primary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = VOI]
-
-primary_voi_missing_binary<-cbind(all_obs_primary_week12[,.(PatientID,index)],primary_voi_missing_binary)
-
-
-
-secondary_voi_missing_binary<-all_obs_secondary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = VOI]
-secondary_voi_missing_binary<-cbind(all_obs_secondary_week12[,.(PatientID,index)],secondary_voi_missing_binary)
-
-
-
-
-primary_aux_missing_binary<-all_obs_primary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = auxilliary]
-primary_aux_missing_binary<-cbind(all_obs_primary_week12[,.(PatientID,index)],primary_aux_missing_binary)
-
-secondary_aux_missing_binary<-all_obs_secondary_week12[,lapply(.SD,function(x)ifelse(is.na(x),1,0)),.SDcols = auxilliary]
-secondary_aux_missing_binary<-cbind(all_obs_secondary_week12[,.(PatientID,index)],secondary_aux_missing_binary)
-
-
-
-
-# join and correlate
-primary_missing_binary<-merge(primary_voi_missing_binary,primary_aux_missing_binary,by=c("PatientID","index"))
-
-secondary_missing_binary<-merge(secondary_voi_missing_binary,secondary_aux_missing_binary,by=c("PatientID","index"))
-
-
-
-```
-
-
-
-```{r results="asis"}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: tbl-corr-missing-aux-primary
-
-
-library(corrr)
-
-
-#Primary
-cor1<-correlate(primary_missing_binary[,.SD,.SDcols = c(VOI,auxilliary)]) |> focus(Albumin,ECOG,weight) 
-
-data.frame(cor1) |> 
-  gt() |> 
-  fmt_number(
-    decimals=3
-  ) |> 
-   tab_header(
-    title = md("A) Primary inclusion criteria")
-    # subtitle = md("`gtcars` is an R dataset")
-  ) |>
-  tab_caption(caption = md("Table XX. Correleation of variables of interests with all other VOI variables / auxiliary variables.")) |> 
-  as_raw_html() |> 
-  cat()
-
-```
-
-```{r results='asis'}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: tbl-corr-missing-aux-secondary
-
-
-#secondary
-
-cor2<-  
-correlate(secondary_missing_binary[,.SD,.SDcols = c(VOI,auxilliary)]) |> focus(Albumin,ECOG,weight)
-
-data.frame(cor2) |> 
-  gt() |> 
-  fmt_number(
-    decimals=3
-  )|> 
-   tab_header(
-    title = md("B) Secondary inclusion criteria")
-    # subtitle = md("`gtcars` is an R dataset")
-  ) |>
-  tab_caption(caption = md("Table XX. Correleation of variables of interests with all other VOI variables / auxiliary variables.")) |> 
-  as_raw_html() |> 
-  cat()
-
-
-
-```
-
-
-
-
-```{r fig.show="hold", out.width='49%',  fig.height=6}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: fig-pattern-missing
-#| fig-cap: Figure XX. Correlation plot for all lab values (plust ECOG and weight) to identify patterns of missing 
-
-
-
-#make a copy that doesn't have date and pateintID
-
-
-#convert to missing or not missing
-all_obs_primary_missing<-copy(all_obs_primary_week12)
-all_obs_primary_missing[,c("PatientID","Date","AdvancedDiagnosisDate","index"):=.(NULL)]
-all_obs_primary_missing<-all_obs_primary_missing[,lapply(.SD,function(x)ifelse(is.na(x),1,0))]
-
-
-all_obs_secondary_missing<-copy(all_obs_secondary_week12)
-all_obs_secondary_missing[,c("PatientID","Date","AdvancedDiagnosisDate","index"):=.(NULL)]
-all_obs_secondary_missing<-all_obs_secondary_missing[,lapply(.SD,function(x)ifelse(is.na(x),1,0))]
-
-
-#primary exclusion 
-DataExplorer::plot_correlation(all_obs_primary_missing,type="continuous", cor_args=list(use="pairwise.complete.obs"), title="A) Primary inclusion criteria") 
-
-#secondary exclusion
-DataExplorer::plot_correlation(all_obs_secondary_missing,type="continuous", cor_args=list(use="pairwise.complete.obs"), title="B) Primary inclusion criteria") 
-```
-
-
-
-\
-
-\
-
-# Subset Calculation
-
-
-In the entire population, it was hard to identify variables that are associated with each other because there were such high number of missing. Thus, we decided to subset the sample by applying all exclusion criteria we used in the landmark analysis until before excluding patients missing covariates.  those who have test result out and have 1L therapy initiated within either 1 week or 4 weeks after the advanced diagnosis date, for primary and secondary inclusion criteria, respectively. The inclusion criteria are as follows:
-
--   did not receive valid test result until the day of advanced diagnosis
--   did not initiate 1L therapy before advanced diagnosis date 
--   survived to 4 weeks
--   have received valid test result by 4 weeks
-
-
-```{r subset, cache=TRUE}
-#| eval: true
-#| echo: false
-#| include: false
-
-
-
-ptData_missing<-readRDS("../ptData_time0_diag_v2.rds")
-
-ptData_missing[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
-ptData_missing[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
-ptData_missing[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
-ptData_missing[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
-ptData_missing[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
-
-
-
-
-#Due to data issue, some people are missing censoring time
-ptData_missing[DeathInd==0 & advDiag_to_death_weeks<0, .N] #371
-pt_exclude<-ptData_missing[DeathInd==0 & advDiag_to_death_weeks<0, PatientID]
-#We will exclude them 
-ptData_missing<-ptData_missing[!PatientID %in% pt_exclude,]
-num_beginning<-nrow(ptData_missing)
-
-
-#Receive 1L therapy before advanced diagnosis date
-ptData_missing[StartDate<AdvancedDiagnosisDate,.N] #994
-exclude_pt<-ptData_missing[StartDate<AdvancedDiagnosisDate,PatientID] 
-ptData_missing<-ptData_missing[!(PatientID %in% exclude_pt),]
-
-
-
-
-#Receive valid test results before advanced diagnosis date
-ptData_missing[observe_valid__before_time0_PDL1==TRUE | observe_valid__before_time0_NoPDL1==TRUE,.N] #6522
-exclude_pt<-ptData_missing[observe_valid__before_time0_PDL1==TRUE | observe_valid__before_time0_NoPDL1==TRUE,PatientID] 
-ptData_missing<-ptData_missing[!(PatientID %in% exclude_pt),]
-
-
-
-
-#survived up to 4 weeks 
-ptData_missing<-ptData_missing[advDiag_to_death_weeks>4,]
-
-
-
-#Receive valid test result prior to the end of 4th week
-ptData_missing<-ptData_missing[advDiag_to_valid_test_week<=4]
-
-npatients_subset<-nrow(ptData_missing)
-
-```
-
-
-
-With the inclusion criteria applied, we have total `r npatients_subset` patients now in our subset for analysis.
-
-
-
-As we can see \@ref(fig:fig-population-missing-subset) (which is a same thing as Figure \@ref(fig:fig-population-missing), but in q subset population), there too much missing so that the pattern doesn't become any useful.
-
-
-```{r fig.show="hold", out.height='33%', cache=T}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-#| label: fig-population-missing-subset
-#| fig-cap: Plots of proportion missing of VOIs on a subset of population. Proportion was calculated with denominator being the number of people alive on the given number of day since advnaced diagnosis date.
-
-
-
-#repeat the same thing on subset. 
-
-#For each dataset, remove all after censoring date 
-tmp1<-copy(labs_missing)
-Albumin_population<-
-lapply(tmp1,function(dat){
-  
-  
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  
-  #restrict to before death/censor.
-  subdat<-subdat[Date<=DateOfDeath,]
-  
-  #index for each day
-  subdat[,num_day_from_diag:=as.numeric(interval(time0,Date),"days")]
-  
-  subdat[,mean(is.na(Albumin)),by=num_day_from_diag]
-
-})
-
-
-
-
-tmp2<-data.table(
-  group=rep(c("Primary inclusion criteria","Secondary inclusion criteria"), times=c(nrow(Albumin_population[[1]]), nrow(Albumin_population[[2]]))),
-  rbind(Albumin_population[[1]],Albumin_population[[2]])
-)
-
-ggplot(tmp2, aes(x=num_day_from_diag, y=V1)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  facet_grid(~group)+
-  ggtitle("Proportion of missing Albumin")+
-  scale_x_continuous(breaks =c(-14*1:6,0,14*1:2) )+
-  scale_y_continuous(breaks =seq(0.95,1,by=0.01)) 
-
-
-# #Zoom in 
-# ggplot(tmp2[num_day_from_diag>=-30], aes(x=num_day_from_diag, y=V1)) +
-#   geom_line() +
-#   labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-#   facet_grid(~group)+
-#   ggtitle("Zoom in to month: Proportion of missing Albumin")+
-#   scale_x_continuous(breaks =c(-14*1:6,0,14*1:2) )
-
-#Likewise for ECOG. back to 4 months
-tmp1<-copy(ECOG_missing)
-ECOG_population<-
-lapply(tmp1,function(dat){
-  
-  
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  
-  #restrict to before death/censor.
-  subdat<-subdat[Date<=DateOfDeath,]
-  
-  #index for each day
-  subdat[,num_day_from_diag:=as.numeric(interval(AdvancedDiagnosisDate,Date),"days")]
-  
-  subdat[,mean(is.na(ECOG)),by=num_day_from_diag]
-
-})
-
-tmp2<-data.table(
-  group=rep(c("Primary inclusion criteria","Secondary inclusion criteria"), times=c(nrow(ECOG_population[[1]]), nrow(ECOG_population[[2]]))),
-  rbind(ECOG_population[[1]],ECOG_population[[2]])
-)
-
-# tmp2$num_day_from_diag |> range() #-123   28
-ggplot(tmp2, aes(x=num_day_from_diag, y=V1)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  facet_grid(~group)+
-  ggtitle("Proportion of missing ECOG")+
-  # scale_x_continuous(breaks =c(-7*1:16,0,7:1*4) )
-  scale_x_continuous(breaks =c(-14*1:8,0,14*1:2) )
-
-
-
-#Body weight up to 1 year before
-tmp1<-copy(weight_missing)
-weight_population<-
-lapply(tmp1,function(dat){
-  
-  
-  subdat<-
-    merge(
-      ptData_missing[,.(PatientID,DateOfDeath)],
-      dat,
-      all.x=T,
-      by="PatientID"
-      )
-  
-  #restrict to before death/censor.
-  subdat<-subdat[Date<=DateOfDeath,]
-  
-  #index for each day
-  subdat[,num_day_from_diag:=as.numeric(interval(AdvancedDiagnosisDate,Date),"days")]
-  
-  subdat[,mean(is.na(weight)),by=num_day_from_diag]
-
-})
-
-tmp2<-data.table(
-  group=rep(c("Primary inclusion criteria","Secondary inclusion criteria"), times=c(nrow(weight_population[[1]]), nrow(weight_population[[2]]))),
-  rbind(weight_population[[1]],weight_population[[2]])
-)
-
-
-ggplot(tmp2, aes(x=num_day_from_diag, y=V1)) +
-  geom_line() +
-  labs(y="Proportion missing", x="Number of days since advanced diagnosis date") +
-  facet_grid(rows=vars(group))+
-  ggtitle("Proportion of missing weight")+
-  # scale_x_continuous(breaks =c(-7*1:16,0,7:1*4) )
-  scale_x_continuous(breaks =c(-14*1:27,0,14*1:2) )
 
 ```
 
