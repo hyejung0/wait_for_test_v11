@@ -5,20 +5,20 @@ author: "Hyejung Lee <hyejung.lee@utah.edu>"
 date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
 always_allow_html: true
 output:
-  # bookdown::github_document2:
-  #   toc: true
-  #   toc_depth: 4
-  #   html_preview: true
-  bookdown::html_document2:
-    keep_md: true
-    self-contained: true
-    embed-resources: true
-    code-fold: true
+  bookdown::github_document2:
     toc: true
     toc_depth: 4
-    theme: united
-    toc_float: true
-    number-sections: true
+    html_preview: true
+  # bookdown::html_document2:
+  #   # keep_md: true
+  #   self-contained: true
+  #   embed-resources: true
+  #   code-fold: true
+  #   toc: true
+  #   toc_depth: 4
+  #   theme: united
+  #   toc_float: true
+  #   number-sections: true
   # word_document:
   #   toc: true
   #   toc_depth: 3
@@ -1114,7 +1114,7 @@ Since many variables seemed like they were observed with equal proportion, it se
 
 Figure \@ref(fig:fig-weekly-interval) shows the plot of amount of missing across the combination of substantially observed variables in 100 randomly selected patients (there were too many observations and too many variables to display the whole dataset).
 
-```{r weekly-interval, fig.height=12, fig.width=10}
+```{r fig.height=12, fig.width=10}
 #| echo: false
 #| eval: true
 #| label: fig-weekly-interval
