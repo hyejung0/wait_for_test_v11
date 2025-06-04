@@ -3625,7 +3625,7 @@ To check if receiving targetable therapy is really beneficial for survival, we s
 
 To build IPW, I thought it would be more appropriate to find the values around the time the person received 1L therapy. That means we need to exclude those who didn't receive 1L therapy so we did exclude them. But among those who received 1L therapy, 8 people didn't have any record of ECOG between 2 months before and up to 1L therapy date and 77 people didn't have any albumin observed 6 weeks prior to and up to 1L therapy date. So we decided to just drop all time-varying variables (ECOG, albumin, weight change). That is, we only used demographic (fixed values) and the binary targetable mutation variable. So this means that in the end, we included those who didn't receive 1L therapy as well.   
 
-`r tmp1` reported high SMD, ranging from `r min(SMD_sw_report)` to `r max(SMD_sw_report)` in the IPW population (\@ref(tab:tbl-primary-wait-1L-dscriptive-both-v2)). Thus, IPW failed to generate pseudopopulations where the potential confounders are evenly distributed. 
+`r tmp1` reported high SMD, ranging from `r min(SMD_sw_report)` to `r max(SMD_sw_report)` in the IPW population (Table \@ref(tab:tbl-primary-wait-1L-dscriptive-both-v2)). Thus, IPW failed to generate pseudopopulations where the potential confounders are evenly distributed. 
 
 ```{r tbl-primary-wait-1L-dscriptive-both-v2,results='asis'}
 #| echo: false
@@ -3667,7 +3667,7 @@ gt(ptData1_wait_out$SMD_table ) |>
 
 
 Nonetheless, we present KM plot for both IPW and no IPW population for exploration. 
- When we don't apply IPW, median survival (95% CI) of those who received targeted therapy was `r  ptData1_wait_out$median_survivals$no_ipw$"cohort=Target therapy"`, while those who didn't were  `r ptData1_wait_out$median_survivals$no_ipw$"cohort=something else"`. When we apply the IPW, those who received targeted therapy was `r  ptData1_wait_out$median_survivals$yes_ipw$"cohort=Target therapy"`, while those who didn't were  `r ptData1_wait_out$median_survivals$yes_ipw$"cohort=something else"` (\@ref(fig:fig-primary-target-KM-v2)).
+ When we don't apply IPW, median survival (95% CI) of those who received targeted therapy was `r  ptData1_wait_out$median_survivals$no_ipw$"cohort=Target therapy"`, while those who didn't were  `r ptData1_wait_out$median_survivals$no_ipw$"cohort=something else"`. When we apply the IPW, those who received targeted therapy was `r  ptData1_wait_out$median_survivals$yes_ipw$"cohort=Target therapy"`, while those who didn't were  `r ptData1_wait_out$median_survivals$yes_ipw$"cohort=something else"` (Figure \@ref(fig:fig-primary-target-KM-v2)).
 
 
 
@@ -3692,6 +3692,661 @@ ptData1_wait_out$KM_curves$yes_ipw
 
 
 ```
+
+
+
+\
+
+
+### modified instruction from Tom
+
+Tom and I met lat in May to discuss about this the KM curve. He thinks that it is more useful that I compare the survival curve of those who received targetable therapy vs something else. So we will go ahead and do that comparison.
+
+We will also set time zero to be 1L therapy. So we will have to obtain the variables again near 1L therapy.
+
+Among 2541 patient who have indicated to have waited until targetable mutation status were observed before proceeding to 1L therapy, only 825 patients had targetable mutation status observed prior to initiating 1L therapy. Among 825 patients, 606 patients received some sort of 1L therapy. 21 patients out of 606 patients were missing some covariate values. Thus, in total, 585 patients were used for analysis. 
+
+
+```{r primary-target-only}
+#| eval: true
+#| echo: false
+#| include: false
+
+ptData1<-readRDS("ptData1_landmark.rds")
+
+#Try to find time to death of those who received targetable therapy
+ptData1_wait<-copy(ptData1)
+ptData1_wait<-ptData1_wait[cohort=="wait",]
+ptData1_wait<-ptData1_wait[,cohort:=NULL]
+ptData1_wait<-ptData1_wait[,cohort:=as.character(NA)]
+ptData1_wait[FirstLineTherapyGroup_old_and_new=="Target",cohort:="Target therapy"]
+ptData1_wait[is.na(cohort),cohort:="something else"]
+ptData1_wait[,cohort:=factor(cohort,levels=c("something else","Target therapy"), labels = c("something else","Target therapy"))]
+
+#Check for their mutation status at baseline. 
+#Up to end of week 4 
+bio<-readRDS("../../../Data/Enhanced_AdvNSCLCBiomarkers.rds")
+setDT(bio)[, TestType := stringr::str_replace(TestType, "Mass spectrometry", "Mass Spectrometry")]
+setDT(bio)[, TestType := stringr::str_replace(TestType, "Other sequencing method", "Other")]
+
+setDT(bio)[ #combine NTRK's
+  , 
+  BiomarkerName := 
+    stringr::str_replace_all(BiomarkerName, 
+                             c("NTRK1"="NTRK",
+                               "NTRK2"="NTRK",
+                               "NTRK3"="NTRK",
+                               "NTRK - unknown gene type"="NTRK",
+                               "NTRK - other"="NTRK"))
+]
+
+mutation_positive<-c(
+  "Mutation positive",
+  "PD-L1 positive",
+  "Rearrangement present",
+  "Rearrangement positive",
+  "Amplification positive",
+  "Protein expression positive",
+  "PD-L1 positive"
+)
+
+#restrict to people of our interest
+bio<-bio[PatientID %in% ptData1_wait$PatientID,]
+#Merge time 0
+bio<-
+merge(bio,
+      ptData1_wait[,.(PatientID,AdvancedDiagnosisDate)],
+      by="PatientID",
+      all=T)
+#Add 4 weeks after diagnosis date
+bio[,week_4:=as.IDate(as.Date(AdvancedDiagnosisDate)+weeks(4))]
+#We want all mutation information that are positive and before 4 weeks after advanced diagnosis date
+bio<-bio[ResultDate<=week_4 & BiomarkerStatus %in% mutation_positive,]
+#Exclude PDL1. It's not target therapy.
+bio<-bio[BiomarkerName!="PDL1"]
+#these are the people who have targetable mutation
+yes_target_wait<-bio[,unique(PatientID)]
+
+ptData1_wait[,targetable_mutation_by_week_4:=FALSE]
+ptData1_wait[PatientID %in% yes_target_wait,targetable_mutation_by_week_4:=TRUE]
+
+#Restrict patient to those who have targetable mutation
+ptData1_wait_have_targetable_mutation<-ptData1_wait[targetable_mutation_by_week_4==TRUE,]
+# nrow(ptData1_wait_have_targetable_mutation) #825
+# nrow(ptData1_wait) #2541
+
+#Only use the people who have 1L therapy
+# ptData1_wait_have_targetable_mutation[,table(FirstLineTherapyGroup)] #there are some who have No therapy. 105 of them. Remove them.
+ptData1_wait_have_targetable_mutation<-ptData1_wait_have_targetable_mutation[FirstLineTherapyGroup!="None",]
+# nrow(ptData1_wait_have_targetable_mutation) #606
+
+#ECOG at 1L therapy
+baselineECOG<-readRDS("../../../Data/BaselineECOG.rds")
+baselineECOG<-baselineECOG[PatientID %in% ptData1_wait_have_targetable_mutation$PatientID,]
+baselineECOG[ECOGValue=="Unknown",ECOGValue:=NA]
+baselineECOG[,ECOGValue:=as.integer(ECOGValue)]
+setnames(baselineECOG,"ECOGValue","EcogValue")
+setnames(baselineECOG,"ECOGDate","Date")
+baselineECOG[,Date:=as.IDate(Date)]
+
+ECOG<-readRDS("../../../Data/ECOG.rds")
+ECOG<-ECOG[PatientID %in% ptData1_wait_have_targetable_mutation$PatientID,]
+setnames(ECOG,"EcogDate","Date")
+ECOG<-unique(ECOG[,.(PatientID,Date,EcogValue)])
+ECOG[,N:=.N,by=.(PatientID,Date)]
+ECOG[N>1,] #We will take average
+ECOG2<-ECOG[,mean(as.numeric(EcogValue),na.rm=T),by=.(PatientID,Date)]
+ECOG2
+setnames(ECOG2,"V1","EcogValue")
+
+
+#get them merged
+both_ECOG<-
+  merge(unique(baselineECOG[,.(PatientID,Date,EcogValue)]),
+        ECOG2[,.(PatientID,Date,EcogValue)],
+        by=c("PatientID","Date"),
+        all=T)
+both_ECOG[,EcogValue.x:=as.numeric(EcogValue.x)]
+both_ECOG[is.na(EcogValue.x),EcogValue.x:=EcogValue.y]
+both_ECOG[,EcogValue.y:=NULL]
+setnames(both_ECOG,"EcogValue.x","EcogValue")
+rm(list=c("baselineECOG","ECOG"))
+both_ECOG
+
+#upto to 2 months before and 1 week after 1L therapy 
+both_ECOG<-
+merge(
+  ptData1_wait_have_targetable_mutation[,.(PatientID,StartDate,AdvancedDiagnosisDate)],
+  both_ECOG,
+  by="PatientID",
+  all.x = T,
+  allow.cartesian = T
+)
+both_ECOG[,min_date:=as.IDate(as.Date(StartDate)  %m-% months(2))]
+both_ECOG[,max_date:=as.IDate(as.Date(StartDate) + days(7)- days(1))]
+
+test<-both_ECOG[min_date<=Date & max_date>=Date,]
+#check how many people got dropped b/c they don't have observation within the 2 weeks before 1L therapy
+table(ptData1_wait_have_targetable_mutation$PatientID %in% test$PatientID )
+# FALSE  TRUE  
+#     2   604 
+# 2 people are missing ECOG. Save their ID
+missing_ECOG<-ptData1_wait_have_targetable_mutation[!PatientID %in% test$PatientID, PatientID]
+#Explore them
+both_ECOG[PatientID %in% missing_ECOG,]
+
+
+
+
+baseline_dat<-both_ECOG[min_date<=Date & max_date>=Date,]
+baseline_dat<-baseline_dat[,days_to_time0:=StartDate-Date]
+baseline_dat[,sum(is.na(EcogValue))] #0. No missing
+baseline_dat[,EcogValue:=as.numeric(EcogValue)]
+
+#Identify if people observed anything within this -2 months to 1 week period.
+tmp<-ptData1_wait_have_targetable_mutation[,.(PatientID)]
+tmp[,observe_lab_within_window:=0]
+tmp[PatientID %in% unique(baseline_dat$PatientID),observe_lab_within_window:=1]
+#If we observe the lab value in either (-2 months , 1 week) 
+#then we give 1. If we don't observe, then we return 0.
+setnames(baseline_dat,"StartDate","time0")
+#Find out the value to use for entry criteria.
+ECOG_for_entry_criteria_func<-function(dat){
+  #Per patient
+  exact_data<-dat[Date==time0,]
+  
+  
+  if(nrow(exact_data)>0){
+    #If we have observation on time zero, get it
+    #Just return the data with averaging if there are more than one measurement
+    return(
+      data.table(time0=unique(exact_data$time0),
+                 Date=unique(exact_data$Date),
+                 EcogValue=mean(exact_data$EcogValue,na.rm=TRUE))
+    )
+    
+    
+  }else{
+    #otherwise,
+    tmp<-dat[Date<=max_date & Date>=min_date,]
+    
+    if(nrow(tmp)==0){
+      #If we have no valid test, then return NA
+      return(
+        data.table(time0=unique(dat$time0),
+                   Date=as.IDate(NA),
+                   EcogValue=as.numeric(NA)
+        ))
+      
+    }
+    
+    #If we have something..
+    
+    #anything before advanced diagnosis date,
+    if(tmp[Date< time0 ,.N]>0){
+      #If we have anything before advanced diagnosis date,
+      #then just return the most recent copy (Clostest to diagnose date)
+      tmp<-tmp[order(Date, decreasing = T),]
+      
+    }else{
+      #Or if we only have observation later than advanced diagnosis date,
+      #Return the one that's closest to advnaced diagnosis date
+      tmp<-tmp[order(Date, decreasing = T),]
+      
+    }
+    return(tmp[1,.(time0,Date,EcogValue)])
+    
+    
+    
+    
+  }
+}
+
+ECOG_for_entry_criteria<-baseline_dat[,ECOG_for_entry_criteria_func(.SD),by=PatientID]
+
+#Merge with data
+out<-
+  merge(tmp,
+        ECOG_for_entry_criteria,
+        by="PatientID",
+        all.x=T,
+        allow.cartesian = T)
+setnames(out,"time0","StartDate")
+
+# out[,table(EcogValue, useNA = "ifany")] # This is the ecogvalue for this new dataset! Only 2 people are missing ECOG.
+# EcogValue
+#    0    1    2    3 <NA> 
+#  190  284  107   23    2 
+ECOG_for_ptData1_wait_have_targetable_mutation<-copy(out)
+
+
+
+
+
+
+
+#Albumin
+lab<-readRDS("../../labs/raw_lab.rds")
+vars<-readRDS("../../labs/baseline_covariates.rds")
+vars[variables=="Albumin"]
+
+# we will just use Albumin
+this_vars<-"Albumin"
+
+#there can be several different baselines we want to use,
+#choose only one here.
+#set the character string that corresponds to the column name.
+this.baseline<-"StartDate"
+
+
+#save the rows we want to use
+this_Test<-vars[variables==this_vars,unique(Test)]
+
+#Save the subdat
+temp<-lab[Test %in% this_Test,]
+
+#remove all invalid dataset
+temp<-temp[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
+
+
+#subset the data to what we need. 
+these.cols<-c("PatientID",this.baseline)
+temp<-merge.data.table(ptData1_wait_have_targetable_mutation[,..these.cols],
+                       temp[,.(PatientID,TestDate,TestUnitsCleaned,TestResultCleaned)],
+                       by="PatientID",
+                       all.x=TRUE,
+                       allow.cartesian=TRUE)
+
+
+### Entry Criteria - start ###
+#For baseline value, time windows are:
+#(-6 weeks,1 week] 
+
+#generate two
+baseline_dat<-copy(temp)
+baseline_dat[,min_date:=as.IDate(as.Date(StartDate)- weeks(6))]
+baseline_dat[,max_date:=as.IDate(as.Date(StartDate)+ weeks(1)-days(1))]
+
+#Extract only those that are within this time frame
+baseline_dat<-baseline_dat[min_date<=TestDate & max_date>=TestDate,]
+baseline_dat<-baseline_dat[,days_to_time0:=StartDate-TestDate]
+setnames(baseline_dat, "StartDate", "time0")
+#Identify if people observed anything within this -6 weeks to 1 week period. 
+
+tmp<-ptData1_wait_have_targetable_mutation[,.(PatientID)]
+tmp[,observe_lab_within_window:=0]
+tmp[PatientID %in% unique(baseline_dat$PatientID),observe_lab_within_window:=1]
+
+
+#If we observe the lab value in either (-6 weeks , 1 week) or (-6 weeks, 4 weeks)
+#then we give 1. If we don't observe, then we return 0.
+
+#If we have observation before advanced diagnosis date, then take the observation closest to that
+
+#Find out the value to use for entry criteria.
+lab_for_entry_criteria_func<-function(dat){
+  #Per patient
+  exact_data<-dat[TestDate==time0,]
+  
+  
+  if(nrow(exact_data)>0){
+    #If we have observation on time zero, get it
+    #Just return the data with averaging if there are more than one measurement
+    return(
+      data.table(time0=unique(exact_data$time0),
+                 TestDate=unique(exact_data$TestDate),
+                 TestResultCleaned=mean(exact_data$TestResultCleaned,na.rm=TRUE))
+    )
+    
+    
+  }else{
+    #otherwise,
+    tmp<-dat[TestDate<=max_date & TestDate>=min_date,]
+    
+    if(nrow(tmp)==0){
+      #If we have no valid test, then return NA
+      return(
+        data.table(time0=unique(dat$time0),
+                   TestDate=as.IDate(NA),
+                   TestResultCleaned=as.numeric(NA)
+        ))
+      
+    }
+    
+    #If we have something..
+    
+    #anything before advanced diagnosis date,
+    if(tmp[TestDate< time0 ,.N]>0){
+      #If we have anything before advanced diagnosis date,
+      #then just return the most recent copy (Clostest to diagnose date)
+      tmp<-tmp[order(TestDate, decreasing = T),]
+      
+    }else{
+      #Or if we only have observation later than advanced diagnosis date,
+      #Return the one that's closest to advnaced diagnosis date
+      tmp<-tmp[order(TestDate, decreasing = T),]
+      
+    }
+    return(tmp[1,.(time0,TestDate,TestResultCleaned)])
+    
+    
+    
+    
+  }
+}
+
+lab_value_for_entry_criteria<-baseline_dat[,lab_for_entry_criteria_func(.SD),by=PatientID]
+
+#Merge with data
+out<-
+  merge(tmp,
+        lab_value_for_entry_criteria,
+        by="PatientID",
+        all.x=T,
+        allow.cartesian = T)
+
+# out[,table(TestResultCleaned, useNA = "ifany")] # This is the albumin for this new dataset! 
+  # 16   19   23   24   26   27   28   29   30   31   32   33   34   35   36 36.9   37 37.3   38   39   40   41 41.8   42 
+  #  1    1    3    2    6    4    6   12   14   17   22   26   36   26   41    1   44    1   45   46   48   45    1   35 
+  # 43 43.8   44   45   46   47   48 <NA> 
+  # 34    1   26   26    7    5    4   20 
+#20 people missing albumin
+Albumin_for_ptData1_wait_have_targetable_mutation<-copy(out)
+
+
+
+
+#Weight
+
+
+#Get baseline weight
+vital<-readRDS("../../../Data/Vitals.rds")
+vital<-vital[PatientID %in% ptData1_wait_have_targetable_mutation$PatientID,]
+
+#Make sure the units are comparable
+vital[Test=="body weight", unique(TestUnitsCleaned)] #"kg" ""
+#Only kg.
+vital[Test=="body weight", unique(TestUnits)] #[1] "lb" ""   "oz" "kg"
+
+#Just extract body weight.
+weight<-vital[Test=="body weight",]
+
+#Want to use kg
+#Is there any missing?
+weight[is.na(TestResult) & !is.na(TestResultCleaned),.N]
+weight[!is.na(TestResult) & is.na(TestResultCleaned),.N]
+weight[!is.na(TestResult) & is.na(TestResultCleaned),]
+weight[!is.na(TestResult) & is.na(TestResultCleaned),.(TestResult,TestUnits,TestResultCleaned,TestUnitsCleaned)]
+#All of TestResult are missing units. 
+#Just use TestResultCleaned.
+
+
+#remove all invalid dataset
+temp<-weight[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
+
+
+#subset the data to what we need. 
+temp<-merge.data.table(ptData1_wait_have_targetable_mutation[,.(PatientID,time0)],
+                       temp[,.(PatientID,TestDate,TestUnitsCleaned,TestResultCleaned)],
+                       by="PatientID",
+                       all.x=TRUE,
+                       allow.cartesian=TRUE)
+
+### Entry Criteria - start ###
+#For entry criteria, see if we have observed at least two weights 
+#In the past 6 months until to maximum times:
+#(-6 months,1 week] 
+
+#We want to look at change in body composition 
+#For the time0, get all data in the window: (-6 months,4 weeks] days
+#choose the value that's closes to 0 distance from time 0. 
+baseline_dat<-copy(temp)
+baseline_dat[,min_date:=as.IDate(as.Date(time0)%m-% months(6))]
+#Up to 1 week after
+baseline_dat[,max_date:=as.IDate(as.Date(time0)+ weeks(1) - days(1))]
+#Extract only those that are within this time frame
+baseline_dat<-baseline_dat[min_date<=TestDate & max_date>=TestDate,]
+baseline_dat<-baseline_dat[,days_to_time0:=time0-TestDate]
+baseline_dat
+
+
+#If we observe the lab value in (-6 weeks , 1 week) 
+#then we give 1. If we don't observe, then we return 0.
+lost_10lbs_or_more<-function(one_dat){
+  # per patient data
+  dat<-copy(one_dat)
+  
+  out<-data.table(
+    observe_at_least_two_weight=FALSE,
+    first_date_observe_losing_10lbs=as.IDate(NA)
+  )
+  
+  #If there's only one record, not allowed to enter study. return NA
+  if(nrow(dat)<2){
+    return(out)
+  }
+  
+  #If there are more than 1 record,
+  out[,observe_at_least_two_weight:=TRUE]
+  
+  #check if we can get the data before advanced diangosis date.
+  #If so, just use those info.
+  if(dat[days_to_time0>=0,.N]>1){
+    dat<-dat[days_to_time0>=0,]
+  }
+  
+  
+  
+  # assume DT is your data.table with columns “Date” and “X”
+  setorder(dat, TestDate)  # make sure it’s in ascending time order
+  
+  # compute running peak and flag drops of ≥10
+  dat[ , peak := cummax(TestResultCleaned) ]
+  dat[ , dropped_10 := (peak - TestResultCleaned) >= 10 ]
+  
+  # find the first date where that flag is TRUE. IF nothing is TRUE, that means this person never lost 10 lbs
+  if( dat[dropped_10 == TRUE,.N]>0){
+    out[,first_date_observe_losing_10lbs:=dat[dropped_10 == TRUE, TestDate][1]]
+  }
+  
+  return(out)
+}
+
+#Averate out if multiple measurement exist for same day
+baseline_dat_average<-baseline_dat[,mean(TestResultCleaned),by=c("PatientID","TestDate","TestUnitsCleaned","min_date","max_date","days_to_time0")]
+setnames(baseline_dat_average,"V1","TestResultCleaned")
+lost_weight<-baseline_dat_average[,lost_10lbs_or_more(.SD),by=PatientID]
+
+
+
+final<-
+  merge(ptData1_wait_have_targetable_mutation[,.(PatientID)],
+        lost_weight,
+        by="PatientID",
+        all.x=T)
+
+final[is.na(observe_at_least_two_weight),observe_at_least_two_weight:=FALSE]
+
+final[,sum(is.na(observe_at_least_two_weight))] #0
+#Everyone has observed at least two weights within this
+#time interval. 
+final[,sum(!is.na(first_date_observe_losing_10lbs))] #31
+#But only 31 people have lost more than 10 lbs.
+
+Weight_for_ptData1_wait_have_targetable_mutation<-copy(final)
+
+
+#Combine all three data together
+ptData1_wait_have_targetable_mutation_covars<-
+merge(
+  ECOG_for_ptData1_wait_have_targetable_mutation[,.(PatientID, StartDate,EcogValue)],
+  Albumin_for_ptData1_wait_have_targetable_mutation[,.(PatientID, TestResultCleaned)],
+  by="PatientID",
+  all=T
+)
+
+ptData1_wait_have_targetable_mutation_covars<-
+merge(
+  ptData1_wait_have_targetable_mutation_covars,
+  Weight_for_ptData1_wait_have_targetable_mutation[,.(PatientID, observe_at_least_two_weight)],
+  by="PatientID",
+  all=T
+)
+
+
+setnames(
+  ptData1_wait_have_targetable_mutation_covars,
+  old=c("EcogValue","TestResultCleaned","observe_at_least_two_weight"),
+  new=c("ECOG","Albumin","Weight_change")
+)
+
+#Find out how many people are missing any values
+# nrow(na.omit(ptData1_wait_have_targetable_mutation_covars))
+# #585
+# nrow(ptData1_wait_have_targetable_mutation_covars)
+# # 606
+
+#606 - 585 =21 patients are lost 
+# It's fine. 
+# let's just exclude them
+
+ptData1_wait_have_targetable_mutation_v2<-
+merge(
+  ptData1_wait_have_targetable_mutation_covars,
+  ptData1_wait_have_targetable_mutation[,.(PatientID, DateOfDeath,DeathInd, RaceEthnicity,SmokingStatus,Histology,Gender,age_at_advDiag,AdvancedDiagnosis_year_rescale, FirstLineTherapyGroup)],
+  all.x = TRUE,
+  by="PatientID"
+)
+# nrow(na.omit(ptData1_wait_have_targetable_mutation_v2)) #585
+ptData1_wait_have_targetable_mutation_v2<-na.omit(ptData1_wait_have_targetable_mutation_v2)
+ptData1_wait_have_targetable_mutation_v2[,cohort:=ifelse(FirstLineTherapyGroup=="Target","Target","something_else")]
+ptData1_wait_have_targetable_mutation_v2[,cohort:=factor(cohort,levels = c("Target","something_else"), labels=c("Target","something_else"))]
+setnames(
+  ptData1_wait_have_targetable_mutation_v2,
+  "StartDate",
+  "time0"
+)
+
+ptData1_wait_have_targetable_mutation_v2[,albumin_binary:=ifelse(Albumin<=35,"<=35",">35" )]
+setnames(
+  ptData1_wait_have_targetable_mutation_v2,
+  "Weight_change",
+  "lost_10lbs"
+)
+
+source("../whole_analysis_func_v2.R")
+ptData1_wait_have_targetable_mutation_v2_out<-whole_analysis_func_v2(
+  ptData1_wait_have_targetable_mutation_v2,
+  covars =   list(
+    "albumin_binary" = "Albumin (<= 35 g/L vs. > 35g/L)",
+    "lost_10lbs" = "Lost >= 10lbs",
+    "ECOG"="ECOG",
+    "SmokingStatus"="SmokingStatus",
+    "Histology"="Histology",
+    "Gender"="Gender",
+    "RaceEthnicity"="Race/Ethnicity",
+    "age_at_advDiag"="Approximate age at Advanced Diagnosis",
+    "AdvancedDiagnosis_year_rescale"="Advanced Diagnosis (year)"
+  ))
+
+# ptData1_wait_have_targetable_mutation_v2_out$KM_curves
+# ptData1_wait_have_targetable_mutation_v2_out$SMD_table 
+#Some are having SMD > 0.1. very much violating SMD. 
+# Save and report 
+SMD_sw<-as.numeric(ptData1_wait_have_targetable_mutation_v2_out$SMD_table$SMD_sw)
+SMD_sw_var<-ptData1_wait_have_targetable_mutation_v2_out$SMD_table$this.rownames
+SMD_sw_report<-SMD_sw[which(SMD_sw>0.1)]
+SMD_sw_var_report<-SMD_sw_var[which(SMD_sw>0.1)]
+SMD_sw_var_report<-stringr::str_remove(string = SMD_sw_var_report,pattern = " \\(%\\)")
+SMD_sw_var_report<-stringr::str_remove(string = SMD_sw_var_report,pattern = " \\(mean \\(SD\\)\\)")
+if(length(SMD_sw_var_report)>1){
+  if(length(SMD_sw_var_report)==2){
+    tmp1<-paste(SMD_sw_var_report,collapse = " and ")
+  }else{
+    except_last<-SMD_sw_var_report[1:(length(SMD_sw_var_report)-1)]
+    tmp1<-paste(except_last,collapse = ", ")
+    tmp1<-paste(tmp1,", and ",SMD_sw_var_report[length(SMD_sw_var_report)], sep = "" )
+
+  }
+}else{
+  tmp1<-SMD_sw_var_report
+}
+# tmp1
+
+
+ptData1_wait_have_targetable_mutation_v2_out_median_target<-ptData1_wait_have_targetable_mutation_v2_out$median_survivals$yes_ipw$"cohort=Target therapy"
+ptData1_wait_have_targetable_mutation_v2_out_median_else<-ptData1_wait_have_targetable_mutation_v2_out$median_survivals$yes_ipw$"cohort=something else"
+
+```
+
+
+\@ref(tab:tbl-primary-wait_have_targetable_mutation) shows the SMD plot of the subset of patients. After IPW, we see that only `r tmp1` is unbalanced but barely bigger than 0.1. Thus, we assume that the covariates are well balanced.
+
+```{r tbl-primary-wait_have_targetable_mutation,results='asis'}
+#| echo: false
+#| eval: true
+#| warning: false
+#| message: false
+
+
+# build gt table
+gt(ptData1_wait_have_targetable_mutation_v2_out$SMD_table ) |> 
+  # First two columns stay as-is:
+  cols_label(
+    this.rownames = "Variable",
+    level         = "Level",
+    # now override the 6 numeric columns’ *display* labels:
+    `something_else`  = "Something else",
+    `Target`    = "Target therapy",
+    SMD        = "SMD",
+    `something_else_sw`  = "Something else",
+    `Target_sw`    = "Target therapy",
+    SMD_sw     = "SMD"
+  ) |> 
+  # create the two spanners:
+  tab_spanner(
+    label   = "No IPW",
+    columns = c(`something_else` , `Target`, SMD)
+  ) |> 
+  tab_spanner(
+    label   = "IPW",
+    columns = c(`something_else_sw` , `Target_sw` ,SMD_sw)
+  ) |> 
+  # optional styling:
+  opt_align_table_header("left") |> 
+  tab_caption(caption = md("Table XX. SMD plots")) |> 
+  as_raw_html() |>  #this will display the table on
+  cat()
+
+```
+
+
+Figure \@ref(fig:fig-primary-target-only-KM) shows KM plots of this population, both before and after IPW. In both subfigure A) and B), we can see that the median survival of patients who received targetable mutation is longer than those who received something else. In the IPW population, the median survival of patients receiving targeted therapy was`r  ptData1_wait_have_targetable_mutation_v2_out$median_survivals$yes_ipw$"cohort=Target therapy"`, while those who received some other therapies were  `r ptData1_wait_have_targetable_mutation_v2_out$median_survivals$yes_ipw$"cohort=something_else"` .
+
+
+
+
+```{r fig.show="hold", out.width='49%',  fig.height=6}
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+#| label: fig-primary-target-only-KM
+#| fig-cap: Figure XX KM plot among 'wait' cohorts who have targetable mutation before receiving 1L therapy, stratified by types of 1L therapy.
+
+
+
+#subfigure a
+ptData1_wait_out$KM_curves$no_ipw
+  
+
+#subfigure b
+ptData1_wait_out$KM_curves$yes_ipw
+
+
+
+```
+
 
 
 
