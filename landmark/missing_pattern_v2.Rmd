@@ -1,0 +1,1008 @@
+---
+title: "Landmark Analysis - find out patterns of missing"
+subtitle: "version 2"
+author: "Hyejung Lee <hyejung.lee@utah.edu>"
+date: "`r format(Sys.time(), '%a %b %d, %Y %X')`"
+always_allow_html: true
+output:
+  bookdown::github_document2:
+    toc: true
+    toc_depth: 4
+    html_preview: true
+  # bookdown::html_document2:
+  #   # keep_md: true
+  #   self-contained: true
+  #   embed-resources: true
+  #   code-fold: true
+  #   toc: true
+  #   toc_depth: 4
+  #   theme: united
+  #   toc_float: true
+  #   number-sections: true
+  # bookdown::pdf_document2:
+  #   toc: true
+  #   toc_depth: 3
+  #   number_sections: true
+  # word_document:
+  #   toc: true
+  #   toc_depth: 3
+  #   number_sections: true
+# bibliography: references.bib
+# csl: nature.csl
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+```{r include=FALSE}
+# knitr::opts_chunk$set(
+#   echo=FALSE,
+#   cache      = TRUE,
+#   cache.lazy = FALSE,   # turn *off* the lazy‐load DB
+#   cache.path = "missing_pattern_v2_cache/", # where to put your .rds files
+#   fig.path   = "missing_pattern_v2_files/"
+# )
+
+# knitr::knit_hooks$set(chunk = function(x, options) x) #for knitting word_document only
+
+# remotes::install_github('yihui/knitr')
+# library(knitr)
+library(VIM)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(survival)
+library(survminer)
+library(officer)
+library(officedown)
+library(flextable)
+library(data.table)
+library(parallel)
+library(kableExtra)
+library(knitr)
+library(lubridate)
+library(tictoc)
+library(gt)
+library(gtsummary)
+library(tidyverse)
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+
+
+
+
+
+
+ncores<-strtoi(Sys.getenv("SLURM_NTASKS")) #Pick up -ntasks or --n from the environment
+setDTthreads(threads = ncores)
+
+```
+
+
+```{r data-setup-main-analysis}
+#| include: false
+
+ptData<-readRDS("../ptData_time0_diag_v2.rds")
+ptData[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
+ptData[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+ptData[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+ptData[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
+ptData[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
+
+
+exclusion_tab<-data.table(
+  "Exclusion"=c("Receive 1L therapy before advanced diagnosis date","Receive valid test results before advanced diagnosis date","Died/censored before end of week 4","Do not have any record of receiving valid test by the end of week 4"),
+  "Number excluded"=as.numeric(NA),
+  "Number remaining"=as.numeric(NA)
+)
+
+
+
+#Due to data issue, some people are missing censoring time
+ptData[DeathInd==0 & advDiag_to_death_weeks<0, .N] #371
+pt_exclude<-ptData[DeathInd==0 & advDiag_to_death_weeks<0, PatientID]
+#We will exclude them 
+ptData<-ptData[!PatientID %in% pt_exclude,]
+num_beginning<-nrow(ptData)
+
+
+#Receive 1L therapy before advanced diagnosis date
+ptData[StartDate<AdvancedDiagnosisDate,.N] #994
+exclude_pt<-ptData[StartDate<AdvancedDiagnosisDate,PatientID] 
+exclusion_tab[Exclusion=="Receive 1L therapy before advanced diagnosis date", `Number excluded`:=length(exclude_pt)]
+exclusion_tab[Exclusion=="Receive 1L therapy before advanced diagnosis date", `Number remaining`:=nrow(ptData)-length(exclude_pt)]
+
+ptData<-ptData[!(PatientID %in% exclude_pt),]
+
+
+
+
+#Receive valid test results before advanced diagnosis date
+ptData[observe_valid__before_time0_PDL1==TRUE | observe_valid__before_time0_NoPDL1==TRUE,.N] #6522
+exclude_pt<-ptData[observe_valid__before_time0_PDL1==TRUE | observe_valid__before_time0_NoPDL1==TRUE,PatientID] 
+
+exclusion_tab[Exclusion=="Receive valid test results before advanced diagnosis date", `Number excluded`:=length(exclude_pt)]
+exclusion_tab[Exclusion=="Receive valid test results before advanced diagnosis date", `Number remaining`:=nrow(ptData)-length(exclude_pt)]
+
+ptData<-ptData[!(PatientID %in% exclude_pt),]
+
+
+
+
+#survived up to 4 weeks 
+exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number excluded`:=ptData[advDiag_to_death_weeks<=4,.N]]
+exclusion_tab[Exclusion=="Died/censored before end of week 4", `Number remaining`:=ptData[advDiag_to_death_weeks>4,.N]]
+
+ptData<-ptData[advDiag_to_death_weeks>4,]
+
+
+
+#Receive valid test result prior to the end of 4th week
+exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number excluded`:=ptData[advDiag_to_valid_test_week>4 | is.na(advDiag_to_valid_test_week),.N]]
+exclusion_tab[Exclusion=="Do not have any record of receiving valid test by the end of week 4", `Number remaining`:=ptData[advDiag_to_valid_test_week<=4,.N]]
+
+
+ptData<-ptData[advDiag_to_valid_test_week<=4]
+```
+
+
+# Context
+
+Taking Tom's advice on 2025/06/04 where we want to do following. 
+
+We want to see if we can impute baseline values for albumin, ECOG, or the binary "lost 10 lbs" variable using observations recorded before the official baseline window. To do this, we’ll define a look-back window that’s the same length as the baseline window itself, starting right before the baseline period. For example, albumin’s baseline window is from 6 weeks before to 1 week after diagnosis (i.e., -6 weeks to +1 week). So, we'll look at the 6 weeks before that baseline window—that is, from -12 weeks to -6 weeks since diagnosis—to see if there are any available observations. If we find data in that earlier interval, we might be able to use it to impute baseline values.
+
+We divide each variable's timeline into three intervals:
+
+1. [2*minimum baseline cut,  minimum baseline cut - 1 day]
+2. [minimum baseline cut,  1 week after time0]
+3. [1 week after time0 + 1 day,  4 weeks after time0]
+
+We were initially hoping to find values in interval 2, but many patients are missing data there. So now, we’ll also check interval 1 to see if any values are available that might help with imputation. Interval 3 was used for secondary inclusion criteria, so we will keep it as is.
+
+For albumin specifically, we will also explore whether there are any auxiliary variables within interval 2 that could assist with imputation.
+
+
+
+\
+
+# Intervals for each variable 
+
+-   Albumin (originally from - 6 weeks):
+    1.  [-12 weeks, -6 week]
+    2.  [-12 weeks, +1 week]
+    3.  [+1 week, +4 week]
+-   ECOG (originally from - 2 months):
+    1.  [-4 months, -2 months]
+    2.  [-2 months, +1 week]
+    3.  [+1 week, +4 week]
+-   Weight change (originally from - 6 months):
+    1.  [-12 months, -6 months]
+    2.  [-6 months, +1 week]
+    3.  [+1 week, +4 week]
+-   All other 20 lab variables (**auxiliary** and originally was not considered for analysis) are going to take the same interval as Albumin
+
+
+
+
+
+```{r ECOG-generation}
+#| echo: false
+
+# 
+# #Read in the data 
+# ptData_missing<-readRDS("../ptData_time0_diag_v2.rds")
+# ptData_missing[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
+# ptData_missing[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+# ptData_missing[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+# ptData_missing[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
+# ptData_missing[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
+# 
+# 
+# 
+# #ECOG at 1L therapy
+# baselineECOG<-readRDS("../../../Data/BaselineECOG.rds")
+# baselineECOG<-baselineECOG[PatientID %in% ptData_missing$PatientID,]
+# baselineECOG[ECOGValue=="Unknown",ECOGValue:=NA]
+# baselineECOG[,ECOGValue:=as.integer(ECOGValue)]
+# setnames(baselineECOG,"ECOGValue","EcogValue")
+# setnames(baselineECOG,"ECOGDate","Date")
+# baselineECOG[,Date:=as.IDate(Date)]
+# 
+# ECOG<-readRDS("../../../Data/ECOG.rds")
+# ECOG<-ECOG[PatientID %in% ptData_missing$PatientID,]
+# setnames(ECOG,"EcogDate","Date")
+# ECOG<-unique(ECOG[,.(PatientID,Date,EcogValue)])
+# ECOG[,N:=.N,by=.(PatientID,Date)]
+# ECOG[N>1,] #We will take average
+# ECOG2<-ECOG[,mean(as.numeric(EcogValue),na.rm=T),by=.(PatientID,Date)]
+# ECOG2
+# setnames(ECOG2,"V1","EcogValue")
+# 
+# 
+# #get them merged
+# both_ECOG<-
+#   merge(unique(baselineECOG[,.(PatientID,Date,EcogValue)]),
+#         ECOG2[,.(PatientID,Date,EcogValue)],
+#         by=c("PatientID","Date"),
+#         all=T)
+# both_ECOG[,EcogValue.x:=as.numeric(EcogValue.x)]
+# both_ECOG[is.na(EcogValue.x),EcogValue.x:=EcogValue.y]
+# both_ECOG[,EcogValue.y:=NULL]
+# setnames(both_ECOG,"EcogValue.x","EcogValue")
+# rm(list=c("baselineECOG","ECOG"))
+# both_ECOG
+# 
+# #upto to 2 months before and 1 week after 1L therapy 
+# both_ECOG<-
+#   merge(
+#     ptData_missing[,.(PatientID,StartDate,AdvancedDiagnosisDate)],
+#     both_ECOG,
+#     by="PatientID",
+#     all.x = T,
+#     allow.cartesian = T
+#   )
+# setnames(both_ECOG,"AdvancedDiagnosisDate","time0")
+# 
+# #for each person, take up to 4 months back to 4 weeks after 
+# both_ECOG[,min_date:=as.IDate(as.Date(time0) %m-% months(4)+days(1))]
+# 
+# 
+# #a day before 2 months before
+# both_ECOG[,two_mths_before_minus_one:=as.IDate(as.Date(time0) %m-% months(2))]
+# 
+# 
+# #create a date 2 months before
+# both_ECOG[,two_mths_before:=as.IDate(as.Date(time0) %m-% months(2)+days(1))]
+# 
+# #1 week after 
+# both_ECOG[,one_week_after:=as.IDate(as.Date(time0) + weeks(1)-days(1))]
+# 
+# #day after 1 week after 
+# both_ECOG[,one_week_after_plus_one:=as.IDate(as.Date(time0) + weeks(1))]
+# 
+# 
+# #4 week after 
+# both_ECOG[,max_date:=as.IDate(as.Date(time0) + weeks(4) -days(1))]
+# 
+# 
+# #For each interval, take the value closest to time0 if ther eis observation
+# both_ECOG[,time0_to_Date:=as.numeric(interval(time0,Date),"days")]
+# both_ECOG[,abs_time0_to_Date:=abs(time0_to_Date)]
+# 
+# 
+# first_interval_return_ECOG_dat<-function(dat){
+# 
+#   subdat<-dat[Date>=min_date & Date<=two_mths_before_minus_one,]
+#   if(nrow(subdat)==0 | all(is.na(subdat$EcogValue))){
+#     return(as.numeric(NA))
+#   }else{
+#     subdat<-dat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat<-subdat[time0_to_Date<0,]
+#       }
+#       
+#       
+#     }
+#     return(subdat[,mean(EcogValue)])
+#   }
+#   
+#   if(any(!is.na(dat$EcogValue))){
+#     subdat<-dat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat[time0_to_Date<0,mean(EcogValue)]
+#       }
+#       
+#       subdat[,mean(EcogValue)]
+#     }
+#   }else{
+#     as.numeric(NA)
+#   }
+# }
+# 
+# second_interval_return_ECOG_dat<-function(dat){
+#   
+#   subdat<-dat[Date>=two_mths_before & Date<=one_week_after,]
+#   if(nrow(subdat)==0 | all(is.na(subdat$EcogValue))){
+#     return(as.numeric(NA))
+#   }else{
+#     subdat<-dat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat<-subdat[time0_to_Date<0,]
+#       }
+#       
+#       
+#     }
+#     return(subdat[,mean(EcogValue)])
+#   }
+#   
+#   if(any(!is.na(dat$EcogValue))){
+#     subdat<-dat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat[time0_to_Date<0,mean(EcogValue)]
+#       }
+#       
+#       subdat[,mean(EcogValue)]
+#     }
+#   }else{
+#     as.numeric(NA)
+#   }
+# }
+# 
+# third_interval_return_ECOG_dat<-function(dat){
+#   
+#   subdat<-dat[Date>=one_week_after_plus_one & Date<=max_date,]
+#   if(nrow(subdat)==0 | all(is.na(subdat$EcogValue))){
+#     return(as.numeric(NA))
+#   }else{
+#     subdat<-dat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat<-subdat[time0_to_Date<0,]
+#       }
+#       
+#       
+#     }
+#     return(subdat[,mean(EcogValue)])
+#   }
+#   
+#   if(any(!is.na(dat$EcogValue))){
+#     subdat<-dat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat[time0_to_Date<0,mean(EcogValue)]
+#       }
+#       
+#       subdat[,mean(EcogValue)]
+#     }
+#   }else{
+#     as.numeric(NA)
+#   }
+# }
+# 
+# 
+# 
+# 
+# interval_return_ECOG_dat<-function(subdat){
+#   
+#   if( all(is.na(subdat$EcogValue))){
+#     return(as.numeric(NA))
+#   }else{
+#     subdat<-subdat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat<-subdat[time0_to_Date<0,]
+#       }
+#       
+#       
+#     }
+#     return(subdat[,mean(EcogValue)])
+#   }
+#   
+#   if(any(!is.na(dat$EcogValue))){
+#     subdat<-dat[!is.na(EcogValue)]
+#     subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#     
+#     if(nrow(subdat)>1){
+#       if(any(subdat$time0_to_Date<0)){
+#         subdat[time0_to_Date<0,mean(EcogValue)]
+#       }
+#       
+#       subdat[,mean(EcogValue)]
+#     }
+#   }else{
+#     as.numeric(NA)
+#   }
+# }
+# 
+# #In the first interval [-4 months , -2 months)
+# ECOG_first_interval<-both_ECOG[Date>=min_date & Date<=two_mths_before_minus_one,]
+# ECOG_first_interval<-ECOG_first_interval[,interval_return_ECOG_dat(.SD), by=PatientID]
+# setnames(ECOG_first_interval,"V1","first")
+# 
+# ECOG_second_interval<-both_ECOG[Date>=two_mths_before & Date<=one_week_after,]
+# ECOG_second_interval<-ECOG_second_interval[,interval_return_ECOG_dat(.SD), by=PatientID]
+# setnames(ECOG_second_interval,"V1","second")
+# 
+# ECOG_third_interval<-both_ECOG[Date>=one_week_after_plus_one & Date<=max_date,]
+# ECOG_third_interval<-ECOG_third_interval[,interval_return_ECOG_dat(.SD), by=PatientID]
+# setnames(ECOG_third_interval,"V1","third")
+# 
+# #combine them all
+# ECOG_interval<-
+# merge(
+#   ptData_missing[,.(PatientID)],
+#   ECOG_first_interval,
+#   by="PatientID",
+#   all.x = T
+# )
+# ECOG_interval<-merge(
+#   ECOG_interval,
+#   ECOG_second_interval,
+#   by="PatientID",
+#   all.x = T
+# )
+# 
+# ECOG_interval<-merge(
+#   ECOG_interval,
+#   ECOG_third_interval,
+#   by="PatientID",
+#   all.x = T
+# )
+# 
+# saveRDS(ECOG_interval,"ECOG_interval.rds")
+# 
+ECOG_interval<-readRDS("ECOG_interval.rds")
+```
+
+
+
+```{r weight-change-generation}
+#| echo: false
+
+
+
+# #Read in the data 
+# ptData_missing<-readRDS("../ptData_time0_diag_v2.rds")
+# ptData_missing[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
+# ptData_missing[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+# ptData_missing[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+# ptData_missing[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
+# ptData_missing[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
+# 
+# 
+# 
+# #Get baseline weight
+# vital<-readRDS("../../../Data/Vitals.rds")
+# vital<-vital[PatientID %in% ptData_missing$PatientID,]
+# 
+# #Make sure the units are comparable
+# vital[Test=="body weight", unique(TestUnitsCleaned)] #"kg" ""
+# #Only kg.
+# vital[Test=="body weight", unique(TestUnits)] #[1] "lb" ""   "oz" "kg"
+# 
+# #Just extract body weight.
+# weight<-vital[Test=="body weight",]
+# 
+# #Want to use kg
+# #Is there any missing?
+# weight[is.na(TestResult) & !is.na(TestResultCleaned),.N]
+# weight[!is.na(TestResult) & is.na(TestResultCleaned),.N]
+# weight[!is.na(TestResult) & is.na(TestResultCleaned),]
+# weight[!is.na(TestResult) & is.na(TestResultCleaned),.(TestResult,TestUnits,TestResultCleaned,TestUnitsCleaned)]
+# #All of TestResult are missing units. 
+# #Just use TestResultCleaned.
+# 
+# 
+# #remove all invalid dataset
+# temp<-weight[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
+# 
+# 
+# #subset the data to what we need. 
+# temp<-merge.data.table(ptData_missing[,.(PatientID,AdvancedDiagnosisDate)],
+#                        temp[,.(PatientID,TestDate,TestUnitsCleaned,TestResultCleaned)],
+#                        by="PatientID",
+#                        all.x=TRUE,
+#                        allow.cartesian=TRUE)
+# 
+# 
+# setnames(temp,"AdvancedDiagnosisDate","time0")
+# 
+# #for each person, take up to 12 months to 6 months before 
+# temp[,min_date:=as.IDate(as.Date(time0) %m-% months(12)+days(1))]
+# 
+# 
+# #a day before 6 months before
+# temp[,six_mths_before_minus_one:=as.IDate(as.Date(time0) %m-% months(6))]
+# 
+# 
+# #create a date 6 months before
+# temp[,six_mths_before:=as.IDate(as.Date(time0) %m-% months(6)+days(1))]
+# 
+# #1 week after 
+# temp[,one_week_after:=as.IDate(as.Date(time0) + weeks(1)-days(1))]
+# 
+# #day after 1 week after 
+# temp[,one_week_after_plus_one:=as.IDate(as.Date(time0) + weeks(1))]
+# 
+# 
+# #4 week after 
+# temp[,max_date:=as.IDate(as.Date(time0) + weeks(4) -days(1))]
+# 
+# 
+# temp[,days_to_time0:=time0-TestDate]
+# 
+# # If we observe the lab value in between a time interval,
+# #then we give 1. If we don't observe, then we return 0.
+# lost_10lbs_or_more<-function(one_dat){
+#   # per patient data
+#   dat<-copy(one_dat)
+#   
+#   out<-data.table(
+#     observe_at_least_two_weight=FALSE,
+#     first_date_observe_losing_10lbs=as.IDate(NA)
+#   )
+#   
+#   #If there's only one record, not allowed to enter study. return NA
+#   if(nrow(dat)<2){
+#     return(out)
+#   }
+#   
+#   #If there are more than 1 record,
+#   out[,observe_at_least_two_weight:=TRUE]
+#   
+#   #check if we can get the data before advanced diangosis date.
+#   #If so, just use those info.
+#   if(dat[days_to_time0>=0,.N]>1){
+#     dat<-dat[days_to_time0>=0,]
+#   }
+#   
+#   
+#   
+#   # assume DT is your data.table with columns “Date” and “X”
+#   setorder(dat, TestDate)  # make sure it’s in ascending time order
+#   
+#   # compute running peak and flag drops of ≥10
+#   dat[ , peak := cummax(TestResultCleaned) ]
+#   dat[ , dropped_10 := (peak - TestResultCleaned) >= 10 ]
+#   
+#   # find the first date where that flag is TRUE. IF nothing is TRUE, that means this person never lost 10 lbs
+#   if( dat[dropped_10 == TRUE,.N]>0){
+#     out[,first_date_observe_losing_10lbs:=dat[dropped_10 == TRUE, TestDate][1]]
+#   }
+#   
+#   return(out)
+# }
+# 
+# #Averate out if multiple measurement exist for same day
+# baseline_dat_average<-temp[,mean(TestResultCleaned),by=c("PatientID","days_to_time0","TestDate","TestUnitsCleaned","min_date","six_mths_before_minus_one","six_mths_before","one_week_after","one_week_after_plus_one","max_date")]
+# setnames(baseline_dat_average,"V1","TestResultCleaned")
+# 
+# 
+# lost_weight_first_interval<-baseline_dat_average[TestDate>=min_date & TestDate<=six_mths_before_minus_one,]
+# lost_weight_first_interval<-lost_weight_first_interval[,lost_10lbs_or_more(.SD),by=PatientID]
+# #Generate new variable indicating losing 10lbs
+# lost_weight_first_interval[,first:=as.logical(NA)]
+# lost_weight_first_interval[observe_at_least_two_weight==TRUE & is.na(first_date_observe_losing_10lbs),first:=FALSE]
+# lost_weight_first_interval[observe_at_least_two_weight==TRUE & !is.na(first_date_observe_losing_10lbs),first:=TRUE]
+# 
+# lost_weight_second_interval<-baseline_dat_average[TestDate>=six_mths_before & TestDate<=one_week_after,]
+# lost_weight_second_interval<-lost_weight_second_interval[,lost_10lbs_or_more(.SD),by=PatientID]
+# #Generate new variable indicating losing 10lbs
+# lost_weight_second_interval[,second:=as.logical(NA)]
+# lost_weight_second_interval[observe_at_least_two_weight==TRUE & is.na(first_date_observe_losing_10lbs),second:=FALSE]
+# lost_weight_second_interval[observe_at_least_two_weight==TRUE & !is.na(first_date_observe_losing_10lbs),second:=TRUE]
+# 
+# 
+# lost_weight_third_interval<-baseline_dat_average[TestDate>=one_week_after_plus_one & TestDate<=max_date,]
+# lost_weight_third_interval<-lost_weight_third_interval[,lost_10lbs_or_more(.SD),by=PatientID]
+# #Generate new variable indicating losing 10lbs
+# lost_weight_third_interval[,third:=as.logical(NA)]
+# lost_weight_third_interval[observe_at_least_two_weight==TRUE & is.na(first_date_observe_losing_10lbs),third:=FALSE]
+# lost_weight_third_interval[observe_at_least_two_weight==TRUE & !is.na(first_date_observe_losing_10lbs),third:=TRUE]
+# 
+# 
+# 
+# #combine them all
+# lost_weight_interval<-
+#   merge(
+#     ptData_missing[,.(PatientID)],
+#     lost_weight_first_interval[,.(PatientID,first)],
+#     by="PatientID",
+#     all.x = T
+#   )
+# lost_weight_interval<-merge(
+#   lost_weight_interval,
+#   lost_weight_second_interval[,.(PatientID,second)],
+#   by="PatientID",
+#   all.x = T
+# )
+# 
+# lost_weight_interval<-merge(
+#   lost_weight_interval,
+#   lost_weight_third_interval[,.(PatientID,third)],
+#   by="PatientID",
+#   all.x = T
+# )
+# saveRDS(lost_weight_interval,"lost_weight_interval.rds")
+lost_weight_interval<-readRDS("lost_weight_interval.rds")
+
+```
+
+
+```{r lab-generation}
+#| echo: false
+
+# #Read in the data 
+# ptData_missing<-readRDS("../ptData_time0_diag_v2.rds")
+# ptData_missing[,advDiag_to_death_weeks:=as.numeric(interval(AdvancedDiagnosisDate,DateOfDeath),"weeks")]
+# ptData_missing[,advDiag_to_valid_PDL1_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_PDL1),"weeks")]
+# ptData_missing[,advDiag_to_valid_gene_week:=as.numeric(interval(AdvancedDiagnosisDate,earliest_valid_ResultDate__on_after_time0_NoPDL1),"weeks")]
+# ptData_missing[,advDiag_to_valid_test_week:=pmin(advDiag_to_valid_PDL1_week,advDiag_to_valid_gene_week,na.rm = T)]
+# ptData_missing[,advDiag_to_1L_week:=as.numeric(interval(AdvancedDiagnosisDate,StartDate),"weeks")]
+# 
+# 
+# 
+# 
+# 
+# 
+# #Albumin
+# lab<-readRDS("../../labs/raw_lab.rds")
+# vars<-readRDS("../../labs/baseline_covariates.rds")
+# lab_vars<-unique(vars$variables)
+# 
+# #Exclude carbon dioxide as it changes too frequently.
+# lab_vars<-lab_vars[lab_vars!="Carbon dioxide"]
+# 
+# 
+# 
+# #there can be several different baselines we want to use,
+# #choose only one here.
+# #set the character string that corresponds to the column name.
+# this.baseline<-"AdvancedDiagnosisDate"
+# 
+# lab_values_out<-
+#   lapply(lab_vars,function(this_vars){
+#     
+# 
+#     
+#     #save the rows we want to use
+#     this_Test<-vars[variables==this_vars,unique(Test)]
+#     
+#     #Save the subdat
+#     temp<-lab[Test %in% this_Test,]
+#     
+#     #remove all invalid dataset
+#     temp<-temp[!is.na(TestResultCleaned) & TestUnitsCleaned!="",]
+#     
+#     
+#     #subset the data to what we need.
+#     these.cols<-c("PatientID",this.baseline)
+#     temp<-merge.data.table(ptData_missing[,..these.cols],
+#                            temp[,.(PatientID,TestDate,TestUnitsCleaned,TestResultCleaned)],
+#                            by="PatientID",
+#                            all.x=TRUE,
+#                            allow.cartesian=TRUE)
+#     
+#     setnames(temp, this.baseline,"time0")
+#     
+#     #for each person, take up to 12 weeks before to 6 weeks before 
+#     temp[,min_date:=as.IDate(as.Date(time0) - weeks(12)+days(1))]
+#     
+#     
+#     #a day before 6 weeks before
+#     temp[,six_wks_before_minus_one:=as.IDate(as.Date(time0) - weeks(6))]
+#     
+#     
+#     #create a date 6 weeks before
+#     temp[,six_wks_before:=as.IDate(as.Date(time0) - weeks(6)+days(1))]
+#     
+#     #1 week after 
+#     temp[,one_week_after:=as.IDate(as.Date(time0) + weeks(1)-days(1))]
+#     
+#     #day after 1 week after 
+#     temp[,one_week_after_plus_one:=as.IDate(as.Date(time0) + weeks(1))]
+#     
+#     
+#     #4 week after 
+#     temp[,max_date:=as.IDate(as.Date(time0) + weeks(4) -days(1))]
+#     
+# 
+#     #For each interval, take the value closest to time0 if ther eis observation
+#     temp[,time0_to_Date:=as.numeric(interval(time0,TestDate),"days")]
+#     temp[,abs_time0_to_Date:=abs(time0_to_Date)]
+#     
+#     
+#     interval_return_lab_dat<-function(subdat){
+#       
+#       if( all(is.na(subdat$TestResultCleaned))){
+#         return(as.numeric(NA))
+#       }else{
+#         subdat<-subdat[!is.na(TestResultCleaned)]
+#         subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#         
+#         if(nrow(subdat)>1){
+#           if(any(subdat$time0_to_Date<0)){
+#             subdat<-subdat[time0_to_Date<0,]
+#           }
+#           
+#           
+#         }
+#         return(subdat[,mean(TestResultCleaned)])
+#       }
+#       
+#       if(any(!is.na(dat$TestResultCleaned))){
+#         subdat<-dat[!is.na(TestResultCleaned)]
+#         subdat<-subdat[abs_time0_to_Date==min(abs_time0_to_Date),]
+#         
+#         if(nrow(subdat)>1){
+#           if(any(subdat$time0_to_Date<0)){
+#             subdat[time0_to_Date<0,mean(TestResultCleaned)]
+#           }
+#           
+#           subdat[,mean(TestResultCleaned)]
+#         }
+#       }else{
+#         as.numeric(NA)
+#       }
+#     }
+#     
+#     
+#     #In the first interval [-4 months , -2 months)
+#     lab_first_interval<-temp[TestDate>=min_date & TestDate<=six_wks_before_minus_one,]
+#     lab_first_interval<-lab_first_interval[,interval_return_lab_dat(.SD), by=PatientID]
+#     setnames(lab_first_interval,"V1","first")
+#     
+#     lab_second_interval<-temp[TestDate>=six_wks_before & TestDate<=one_week_after,]
+#     lab_second_interval<-lab_second_interval[,interval_return_lab_dat(.SD), by=PatientID]
+#     setnames(lab_second_interval,"V1","second")
+#     
+#     lab_third_interval<-temp[TestDate>=one_week_after_plus_one & TestDate<=max_date,]
+#     lab_third_interval<-lab_third_interval[,interval_return_lab_dat(.SD), by=PatientID]
+#     setnames(lab_third_interval,"V1","third")
+#     
+#     #combine them all
+#     lab_interval<-
+#       merge(
+#         ptData_missing[,.(PatientID)],
+#         lab_first_interval,
+#         by="PatientID",
+#         all.x = T
+#       )
+#     lab_interval<-merge(
+#       lab_interval,
+#       lab_second_interval,
+#       by="PatientID",
+#       all.x = T
+#     )
+#     
+#     lab_interval<-merge(
+#       lab_interval,
+#       lab_third_interval,
+#       by="PatientID",
+#       all.x = T
+#     )
+#     
+#     lab_interval
+# 
+#   })
+# 
+# names(lab_values_out)<-lab_vars
+# saveRDS(lab_values_out,"lab_values_out.rds")
+lab_values_out<-readRDS("lab_values_out.rds")
+```
+
+
+
+
+\
+
+\
+
+# Identify people who have observations in the 3 intervals
+
+
+Figure \@ref(fig:fig-ECOG-VIM-plot) shows missing patterns in ECOG variable.
+
+```{r results='hide',fig.height=5, fig.width=10}
+#| echo: false
+#| eval: true
+#| label: fig-ECOG-VIM-plot
+#| fig.cap: "Plots of histogram and patterns of missing ECOG values over 3 intervals. Red inidates missing, and navy indicates observed. Intervals are printed as 'first','second', and 'third'. All population (N=85,572) were used."
+
+#to suppress the data printed out with aggr, set results='hide'.
+
+
+aggr(ECOG_interval[,.SD,.SDcols = c("first","second","third")], 
+     col=c('navyblue','red'), 
+     numbers=TRUE, 
+     sortVars=TRUE, 
+     # labels=c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]"), 
+     cex.axis=.7, gap=3,
+     combined=FALSE,
+     ylab=c("Histogram of missing data","Pattern"))
+
+# ECOG_interval_tmp<-copy(ECOG_interval)
+# setnames(
+#   ECOG_interval_tmp,
+#   old= c("first","second","third"),
+#   new=c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]")
+# )
+# aggr(ECOG_interval_tmp[,.SD,.SDcols = c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]")], 
+#      col=c('navyblue','red'), 
+#      numbers=TRUE, 
+#      sortVars=FALSE, 
+#      labels=c("(-4 mths, -2 mths)","(-2 mths, +1 week)","(+1 week, +4 week)"),
+#      cex.axis=.7, gap=3,
+#      combined=FALSE,
+#      ylab=c("Histogram of missing data","Pattern"))
+
+```
+
+
+Based on Figure \@ref(fig:fig-ECOG-VIM-plot), nearly half of the patients (47.5%) are missing ECOG observations at all time points. When ECOG is missing in the second interval (which is our primary interval of interest), we can’t impute values using the prior or subsequent intervals because 48% of patients are missing ECOG entirely. So instead, we decided to subset the cohort by applying the same exclusion criteria used in the main analysis—except for the final criterion that required complete observations. Figure \@ref(fig:fig-ECOG-VIM-plot-subset) shows the missingness pattern in this subset. The majority of patients have at least one ECOG value recorded in the third interval [+1 week, +4 weeks], but 37% still have no ECOG observations at all.
+
+```{r results='hide',fig.height=5, fig.width=10}
+#| echo: false
+#| eval: true
+#| label: fig-ECOG-VIM-plot-subset
+#| fig.cap: "Plots of histogram and patterns of missing ECOG values over 3 intervals. Red inidates missing, and navy indicates observed. Intervals are printed as 'first','second', and 'third'. Only subset of population who met all exclusion criteria used in main analysis were used (N=27, 706)."
+
+
+aggr(ECOG_interval[PatientID %in% ptData$PatientID,.SD,.SDcols = c("first","second","third")], 
+     col=c('navyblue','red'), 
+     numbers=TRUE, 
+     sortVars=TRUE, 
+     # labels=c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]"), 
+     cex.axis=.7, gap=3,
+     combined=FALSE,
+     ylab=c("Histogram of missing data","Pattern"))
+```
+
+
+\
+
+We also created similar plots for the binary variable indicating whether a patient lost more than 10 lbs (Figure \@ref(fig:fig-Weight-change-VIM-plot)). Again, most patients have no recorded weight change. So, we decided to subset the cohort again (Figure \@ref(fig:fig-Weight-change-VIM-plot-subset)). Unfortunately, even after subsetting, a large proportion of patients (43%) are still missing weight change observations.
+
+
+```{r results='hide',fig.height=5, fig.width=10}
+#| echo: false
+#| eval: true
+#| label: fig-Weight-change-VIM-plot
+#| fig.cap: "Plots of histogram and patterns of missing weight change variable values over 3 intervals. Red inidates missing, and navy indicates observed. Intervals are printed as 'first','second', and 'third'. All population (N=85,572) were used."
+
+#to suppress the data printed out with aggr, set results='hide'.
+
+
+aggr(lost_weight_interval[,.SD,.SDcols = c("first","second","third")], 
+     col=c('navyblue','red'), 
+     numbers=TRUE, 
+     sortVars=TRUE, 
+     # labels=c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]"), 
+     cex.axis=.7, gap=3,
+     combined=FALSE,
+     ylab=c("Histogram of missing data","Pattern"))
+```
+
+```{r results='hide',fig.height=5, fig.width=10}
+#| echo: false
+#| eval: true
+#| label: fig-Weight-change-VIM-plot-subset
+#| fig.cap: "Plots of histogram and patterns of missing weight change variable values over 3 intervals. Red inidates missing, and navy indicates observed. Intervals are printed as 'first','second', and 'third'. Only subset of population who met all exclusion criteria used in main analysis were used (N=27, 706)."
+
+#to suppress the data printed out with aggr, set results='hide'.
+
+
+aggr(lost_weight_interval[PatientID %in% ptData$PatientID,.SD,.SDcols = c("first","second","third")], 
+     col=c('navyblue','red'), 
+     numbers=TRUE, 
+     sortVars=TRUE, 
+     # labels=c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]"), 
+     cex.axis=.7, gap=3,
+     combined=FALSE,
+     ylab=c("Histogram of missing data","Pattern"))
+```
+
+
+
+
+\
+
+Figure \@ref(fig:fig-Albumin-change-VIM-plot) and Figure \@ref(fig:fig-Albumin-change-VIM-plot-subset) show the missingness pattern for albumin. In the subset of patients (Figure \@ref(fig:fig-Albumin-change-VIM-plot-subset)), many have at least one measurement in the third interval [+1 week, +4 weeks] (37%). However, the next most common pattern is having no albumin measurements at all (35%).
+
+```{r results='hide',fig.height=5, fig.width=10}
+#| echo: false
+#| eval: true
+#| label: fig-Albumin-change-VIM-plot
+#| fig.cap: "Plots of histogram and patterns of missing Albumin over 3 intervals. Red inidates missing, and navy indicates observed. Intervals are printed as 'first','second', and 'third'. All population (N=85,572) were used."
+
+#to suppress the data printed out with aggr, set results='hide'.
+
+
+aggr(lab_values_out$Albumin[,.SD,.SDcols = c("first","second","third")], 
+     col=c('navyblue','red'), 
+     numbers=TRUE, 
+     sortVars=TRUE, 
+     # labels=c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]"), 
+     cex.axis=.7, gap=3,
+     combined=FALSE,
+     ylab=c("Histogram of missing data","Pattern"))
+```
+
+```{r results='hide',fig.height=5, fig.width=10}
+#| echo: false
+#| eval: true
+#| label: fig-Albumin-change-VIM-plot-subset
+#| fig.cap: "Plots of histogram and patterns of missing weight change variable values over 3 intervals. Red inidates missing, and navy indicates observed. Intervals are printed as 'first','second', and 'third'. Only subset of population who met all exclusion criteria used in main analysis were used (N=27, 706)."
+
+#to suppress the data printed out with aggr, set results='hide'.
+
+
+aggr(lab_values_out$Albumin[PatientID %in% ptData$PatientID,.SD,.SDcols = c("first","second","third")], 
+     col=c('navyblue','red'), 
+     numbers=TRUE, 
+     sortVars=TRUE, 
+     # labels=c("[-4 mths, -2 mths]","[-2 mths, +1 week]","[+1 week, +4 week]"), 
+     cex.axis=.7, gap=3,
+     combined=FALSE,
+     ylab=c("Histogram of missing data","Pattern"))
+```
+
+
+
+
+\
+
+\
+
+# Identifying from auxiliary variables
+
+Just for Albumin, we will check among the patient missing albumin in the second interval, how many of them have observations in auxiliary variables. Figure \@ref(fig:fig-Albumin-aux) shows proportion of patients who observed the auxiliary variable during the 2nd interval among those who didn't observe Albumin in the 2nd interval. As in the previous section, we've restricted our patients to 27,706. As can be found in Figure \@ref(fig:fig-Albumin-aux), HGB (hemoglobin) was the variable with highest proportion of patients with observation. 
+
+
+```{r results='hide',fig.height=5, fig.width=5}
+#| echo: false
+#| eval: true
+#| label: fig-Albumin-aux
+#| fig.cap: "Barplot showing the proportion of patients who observed the auxiliary variable during 2nd interval among those who are missing Albumin during the 2nd interval."
+
+
+#Restrict to those in ptData
+pt<-lab_values_out$Albumin[is.na(second),PatientID]
+# length(pt)
+# [1] 63446
+pt<-pt[pt %in% ptData$PatientID]
+# length(pt)
+# [1] 20497
+
+
+#2. find proportion of patients who have observation in aux variables
+prop_observed<-
+lapply(2:length(lab_values_out),function(i){ #skip first one, which is Albumin
+  
+  dat<-lab_values_out[[i]]
+  tmp<-dat[PatientID %in% pt,.(PatientID,second)]
+  #calculate proportion with observation 
+  tmp[,mean(!is.na(second))]
+})
+names(prop_observed)<-names(lab_values_out)[2:length(lab_values_out)]
+prop_observed<- sapply(prop_observed,'[[',1)
+max(prop_observed)
+
+# Convert to a tidy data-frame
+tmp_dt <- data.table("Variable"=names(prop_observed), "Value" = prop_observed) # 0.0674245 <- 6.7% only!
+
+# 3. Draw the bar plot
+ggplot(tmp_dt, aes(x = Variable, y = Value)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    x = "Auxiliary variable",                   
+    y = "Proportion of patients who observed the variable"
+  ) +
+  theme_bw()+
+  coord_flip()
+
+
+```
+
+
